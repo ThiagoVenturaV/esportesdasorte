@@ -16,7 +16,7 @@
 #image{
     display: flex;
     justify-content: center;
-    align-itens: center;
+    align-items: center;
 }
 #image img{
     height: 500px;
