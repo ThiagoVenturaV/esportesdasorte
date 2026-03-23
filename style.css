@@ -13,6 +13,8 @@
     padding: 0;
     background-color: black;
 }
+body{
+  height:100vh
 #image{
     display: flex;
     justify-content: center;
