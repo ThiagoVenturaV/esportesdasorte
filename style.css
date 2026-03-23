@@ -13,10 +13,11 @@
     padding: 0;
     background-color: black;
 }
-body{
+#image{
     display: flex;
     justify-content: center;
     align-items: center;
+    text-align: center
 }
 #image img{
     height: 500px;
