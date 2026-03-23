@@ -15,7 +15,8 @@
 }
 #image{
     display: flex;
-    justify-content: center
+    justify-content: center;
+    align-itens: center;
 }
 #image img{
     height: 500px;
