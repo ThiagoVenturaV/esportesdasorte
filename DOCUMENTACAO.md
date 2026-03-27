@@ -1,299 +1,420 @@
-# Edson — Assistente Digital
+# Documentação Técnica da Aplicação
 
-> Assistente de IA integrado ao projeto Esportes da Sorte, alimentado pelo Google Gemini Flash 1.5.
+Este documento descreve de forma unificada o design system, a arquitetura e os fluxos de negócio da aplicação Esportes da Sorte, cobrindo frontend, backend e banco de dados.
+
+Objetivo deste documento:
+
+- Explicar o que cada camada faz.
+- Explicar por que cada decisão foi tomada.
+- Facilitar manutenção, onboarding e evolução do produto.
+
+## 1. Visão Geral
+
+A aplicação é uma plataforma de apoio a apostas esportivas com foco em:
+
+- Listagem de jogos ao vivo e futuros.
+- Análise de partidas com IA (Edson).
+- Recomendações de aposta com CTA acionável.
+- Fluxo de autenticação de usuários.
+
+Arquitetura de alto nível:
+
+- Frontend SPA em React/Vite.
+- Backend API em FastAPI/Python.
+- Persistência em PostgreSQL (Neon).
+- Fontes externas de dados (Sportingtech, BetsAPI, FBref, fallback web).
+
+## 2. Arquitetura Frontend
+
+### 2.1 Stack e papel
+
+- React + Vite: UI e bundling.
+- react-router-dom: roteamento SPA.
+- framer-motion: animações de interação.
+- recharts: visualização de momentum.
+
+Para que existe:
+
+- Entregar experiência rápida e responsiva de consumo de odds, análises e apostas.
+
+### 2.2 Organização por camadas (src)
+
+- api/: acesso a dados (partidas, análises, apostas).
+- components/: componentes visuais e comportamentais.
+- pages/: páginas de rota.
+- config/: contrato de rotas, marca e URLs-base.
+- services/: integração com backend/IA e sessão de usuário.
+- styles/: design system global (tokens + reset/utilitários).
+
+Para que existe:
+
+- Isolar responsabilidades e reduzir acoplamento entre UI, navegação e dados.
+
+### 2.3 Rotas e navegação
+
+Rotas centrais:
+
+- Públicas: home, ao-vivo, apostas, análise de partida, login, registro, recuperar senha.
+- Protegidas: minha conta e segurança da conta.
+
+Proteção:
+
+- RequireAuth valida sessão local e redireciona para login quando necessário.
+
+Para que existe:
+
+- Separar áreas públicas da área autenticada sem duplicar lógica em cada página.
+
+### 2.4 Camada de dados do frontend
+
+Partidas ao vivo:
+
+- Tentativa 1: endpoint live-fixture (Sportingtech).
+- Tentativa 2: endpoint popular odds (Sportingtech generic).
+- Tentativa 3: fallback backend DB-first (/api/analises-ao-vivo).
+
+Cache no navegador:
+
+- sessionStorage com TTL de 45s para jogos ao vivo.
+- Evita recarregar toda troca de página.
+
+Análise:
+
+- /api/analisar/{match_id} para análise completa.
+- /api/analises-salvas/{match_id} para first paint mais rápido.
+
+Apostas:
+
+- bets.js ainda usa mock local (camada pronta para troca por API real).
+
+Para que existe:
+
+- Garantir disponibilidade da tela ao vivo mesmo com falha de fornecedor externo e reduzir latência percebida.
+
+### 2.5 Fluxo de autenticação no frontend
+
+- Login salva usuário em storage e publica evento de auth.
+- Menus (TopBar, SideMenu, DesktopSidebar) reagem ao estado logado/deslogado.
+- Logout limpa sessão e atualiza UI imediatamente.
+
+Cadastro:
+
+- Máscaras e limites de entrada:
+  - CPF: 11 dígitos (com máscara visual).
+  - Telefone: 10 ou 11 dígitos (com máscara visual).
+  - Senha mínima: 8 caracteres.
+
+Para que existe:
+
+- Melhorar UX de cadastro e reduzir erros de dados antes de chegar ao backend.
+
+## 3. Design System (Frontend)
+
+### 3.1 Fonte de verdade
+
+Tokens centrais em styles/tokens.css:
+
+- Cores de marca (primary, accent, semânticas).
+- Tipografia (fontes e escalas).
+- Espaçamento, radius, sombras, z-index e transições.
+
+Reset e utilitários em styles/global.css:
+
+- Reset global, scrollbar, classes utilitárias e animações base.
+
+Configuração de marca em config/brand.jsx:
+
+- Identidade textual, paleta, tipografia e catálogo de esportes.
+
+Para que existe:
+
+- Padronizar visual e comportamento da interface com governança única.
+
+### 3.2 Princípios de UI aplicados
+
+- Mobile-first com breakpoints principais em 768px e 1024px.
+- Layout shell com topbar fixa, sidebars e bottom nav adaptativo.
+- Componentização com CSS Modules para escopo local.
+- Estados visuais consistentes: hover/focus/active/loading/skeleton.
+
+Para que existe:
+
+- Garantir consistência visual, acessibilidade e manutenção simples.
+
+### 3.3 Design system do Edson
+
+Edson tem tokens próprios em components/Edson/edson.css:
+
+- Tema escuro/claro por variáveis.
+- Estrutura BEM para barra/painel/mensagem/avatar.
+- Animações: digitação, pulse, loading dots, fade.
+
+Para que existe:
+
+- Permitir evolução do assistente sem quebrar o restante do sistema visual.
+
+## 4. Arquitetura Backend
+
+### 4.1 Stack e papel
+
+- FastAPI para APIs REST.
+- psycopg2 + RealDictCursor para acesso ao PostgreSQL.
+- requests para integrações externas.
+- Groq SDK para geração com LLM.
+
+Para que existe:
+
+- Centralizar segurança, contexto e regras de negócio fora do navegador.
+
+### 4.2 Módulos principais
+
+main.py:
+
+- Exposição de rotas públicas de saúde, auth, análises e chat.
+- Worker de atualização contínua de análises ao vivo.
+- Orquestração de contexto e construção de CTA de aposta.
+
+rag_service.py:
+
+- Coleta de dados ao vivo/futuros.
+- Consulta de histórico no banco.
+- Geração de análise com LLM e fallback determinístico DB-only.
+- Persistência e leitura de cache de análises.
+
+db_neon.py:
+
+- Conexão Neon e inicialização de tabelas-base.
+
+create_schema.py / ingest_parquet_to_neon.py / import_fbref_csv_to_neon.py / cron_refresh_data.py:
+
+- Setup de schema, ingestão histórica, carga FBref e rotinas de manutenção.
+
+Para que existe:
+
+- Separar API pública, IA/RAG e pipeline de dados para manutenção independente.
+
+### 4.3 Rotas e finalidade
+
+- GET /health:
+  - Liveness check para deploy e monitoramento.
+
+- POST /api/login:
+  - Login por email/senha com verificação de hash.
+  - Migração automática de senha legada em texto para hash PBKDF2 no primeiro login válido.
+
+- POST /api/usuarios:
+  - Registro de usuário com validações de payload e persistência segura.
+
+- GET /api/usuarios:
+  - Listagem administrativa simplificada (sem senha).
+
+- GET /api/analises-salvas/{match_id}:
+  - Leitura de análise já persistida para resposta rápida.
+
+- GET /api/analises-ao-vivo:
+  - Lista de análises ao vivo DB-first para alimentar home/live sem depender diretamente do provedor externo.
+
+- GET /api/analisar/{match_id}:
+  - Geração/retorno de análise completa de partida.
+
+- POST /api/chat:
+  - Chat do Edson com contexto multi-fonte e CTA de aposta.
+
+Para que existe:
+
+- Tornar o backend a única porta de decisão e contexto da IA, reduzindo alucinação e fragilidade no frontend.
+
+### 4.4 Estratégia de robustez
+
+- Worker background em startup para atualizar cache/análises live.
+- Cache no banco para partidas ao vivo (tb_live_match_cache).
+- Fallbacks em cascata para dados externos indisponíveis.
+- Sanitização e limitação de saída textual do chat.
+- Modo DB-only configurável por ambiente.
+
+Para que existe:
+
+- Manter respostas estáveis mesmo em falhas de rede/API de terceiros.
+
+### 4.5 Modelo LLM atual
+
+Padrão atual via variável GROQ_MODEL:
+
+- meta-llama/llama-4-scout-17b-16e-instruct
+
+Uso:
+
+- Chat em main.py
+- Análise em rag_service.py
+
+Para que existe:
+
+- Garantir consistência de comportamento da IA em todos os fluxos.
+
+## 5. Arquitetura de Banco de Dados (Neon / PostgreSQL)
+
+### 5.1 Tabelas principais
+
+tb_usuario:
+
+- Cadastro/autenticação.
+- email e cpf únicos.
+- senha armazenada em hash PBKDF2 (campo senha_usuario).
+
+tb_analise:
+
+- Cache e histórico de análises por match_id em JSONB.
+
+tb_partida_historico:
+
+- Base histórica de partidas (StatsBomb/parquet ingest).
+
+tb_fbref_player_stats:
+
+- Estatísticas de jogadores/equipes por temporada (carga CSV FBref).
+
+tb_live_match_cache:
+
+- Cache operacional de partidas ao vivo com score/minuto e payload bruto.
+
+tb_chat_historico (opcional em schema):
+
+- Histórico de perguntas/respostas por usuário/partida.
+
+### 5.2 Índices e performance
+
+- Índices por campos de busca e ordenação frequentes:
+  - email de usuário.
+  - match_id de análise.
+  - updated_at e league_name no cache live.
+  - chaves de temporada/jogador/equipe em FBref.
+
+Para que existe:
+
+- Reduzir latência de leitura em rotas de alto tráfego (live/chat/análise).
+
+### 5.3 Ingestão e manutenção
+
+- ingest_parquet_to_neon.py:
+  - carrega matches\_\*.parquet para tb_partida_historico com ON CONFLICT DO NOTHING.
+
+- import_fbref_csv_to_neon.py:
+  - carrega CSV de jogadores para tb_fbref_player_stats com upsert por chave composta.
+
+- cron_refresh_data.py:
+  - garante schema, roda ingest incremental e limpa cache antigo de tb_analise.
+
+Para que existe:
+
+- Manter base histórica sempre pronta para contexto de IA sem impacto no runtime do frontend.
+
+## 6. Fluxos End-to-End
+
+### 6.1 Tela Ao Vivo
+
+1. Front tenta Sportingtech live-fixture.
+2. Se falhar/vazio, tenta popular odds.
+3. Se ainda vazio, consome /api/analises-ao-vivo no backend.
+4. Resultado é cacheado no navegador por 45s.
+
+Objetivo:
+
+- Evitar tela vazia e reduzir recarregamentos desnecessários.
+
+### 6.2 Análise de Partida
+
+1. Front consulta análise salva para resposta rápida.
+2. Back usa cache DB quando possível.
+3. Se necessário, gera nova análise com RAG/LLM.
+4. Salva em tb_analise para reuso.
+
+Objetivo:
+
+- Entregar análise robusta com baixa latência.
+
+### 6.3 Chat Edson
+
+1. Front envia mensagem/histórico para /api/chat.
+2. Back monta contexto combinando:
+   - histórico de partidas,
+   - FBref,
+   - jogos ao vivo,
+   - jogos futuros,
+   - fallback web (quando permitido).
+3. Back chama LLM e aplica pós-processamento/guardrails.
+4. Retorna texto curto + CTA de aposta.
+
+Objetivo:
+
+- Recomendação acionável com ancoragem em dados reais.
+
+### 6.4 Cadastro e Login
+
+Cadastro:
+
+- Front valida formato e limites.
+- Back valida novamente, normaliza e persiste hash.
+
+Login:
+
+- Back verifica hash e retorna payload seguro do usuário.
+- Front persiste sessão local e libera rotas protegidas.
+
+Objetivo:
+
+- Segurança por defesa em profundidade (cliente + servidor).
+
+## 7. Segurança e Governança
+
+Medidas atuais:
+
+- Senha hasheada com PBKDF2 no backend.
+- Validação de entrada no frontend e backend.
+- CORS configurável por ambiente.
+- Fallbacks controlados para indisponibilidade externa.
+
+Pontos de atenção:
+
+- Sessão atual no frontend é baseada em storage local (não JWT/refresh token).
+- Recomenda-se evoluir para autenticação com token e expiração no servidor.
+
+## 8. Variáveis de Ambiente Relevantes
+
+Frontend:
+
+- VITE_BACKEND_URL
+
+Backend:
+
+- NEON_URL
+- GROQ_API_KEY
+- GROQ_MODEL
+- BETS_API_TOKEN
+- CORS_ORIGINS
+- EDSON_DB_ONLY_MODE
+- CHAT_DB_ONLY_MODE
+- RAG_DISABLE_WEB_FETCH
+- LIVE_ANALYSIS_REFRESH_SECONDS
+- LIVE_MATCHES_DB_MAX_AGE_SECONDS
+- LIVE_ANALYSIS_BACKGROUND_REFRESH
+- PARQUET_DIR
+- INGEST_LIMIT_FILES
+- ANALYSIS_CACHE_RETENTION_DAYS
+
+## 9. Diretrizes de Evolução
+
+Quando alterar a arquitetura:
+
+- Atualizar este documento no mesmo PR.
+- Registrar impactos de schema, rotas e contratos de payload.
+- Garantir fallback para não regressão de UX.
+
+Quando adicionar novo fornecedor de dados:
+
+- Declarar prioridade da fonte.
+- Definir TTL/cache e política de fallback.
+- Documentar impacto em custo, latência e confiabilidade.
 
 ---
 
-## Visão Geral do Sistema
-
-O Edson é um assistente digital inteligente embutido na interface do projeto **Esportes d.a Sorte**. Ele aparece como uma barra "Ask AI" acima do hero da HomePage, permitindo que o usuário faça perguntas em linguagem natural e receba respostas em tempo real com efeito de digitação. (typewriter).
-
-**Características principais:**
-- 🤖 Alimentado pela API Google Gemini Flash 1.5
-- ✍️ Efeito typewriter caractere por caractere
-- 💬 Histórico de conversa persistente na sessão
-- 🌗 Suporte a dark e light mode.
-- 📱 Responsivo — mobile-first com breakpoint em 768px
-- ⚡ Zero dependências adicionais — usa apenas as libs já instaladas no projeto.
-
----
-
-## Pré-requisitos e Instalação
-
-O sistema Edson não requer nenhuma instalação adicional. Ele usa apenas:
-- React 19 (já instalado)
-- Vite 8 (já instalado)
-
-**Nenhum `npm install` adicional é necessário.**
-
----
-
-## Configuração do .env
-
-1. Copie o arquivo `.env.example` para `.env` na raiz do projeto:
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Preencha a chave da API Gemini:
-   ```env
-   VITE_GEMINI_KEY=sua_chave_da_api_gemini_aqui
-   VITE_EDSON_MAX_HISTORY=10
-   VITE_TYPEWRITER_SPEED=18
-   ```
-
-| Variável | Descrição | Padrão |
-|----------|-----------|--------|
-| `VITE_GEMINI_KEY` | Chave de API do Google Gemini | (obrigatório) |
-| `VITE_EDSON_MAX_HISTORY` | Máximo de mensagens enviadas à API | `10` |
-| `VITE_TYPEWRITER_SPEED` | Velocidade do typewriter em ms | `18` |
-
----
-
-## Como Obter a Chave da API Gemini
-
-1. Acesse [Google AI Studio](https://aistudio.google.com/apikey)
-2. Faça login com sua conta Google
-3. Clique em **"Create API Key"**
-4. Copie a chave gerada
-5. Cole no arquivo `.env` como valor de `VITE_GEMINI_KEY`
-
-> ⚠️ **Importante:** Nunca commite o arquivo `.env` no repositório. Ele já está no `.gitignore`.
-
----
-
-## Estrutura de Arquivos Criados
-
-```
-raiz/
-├── .env.example                          # Template de variáveis de ambiente
-├── DOCUMENTACAO.md                       # Esta documentação
-│
-└── src/
-    ├── utils/
-    │   └── edsonHelpers.js               # Funções utilitárias puras
-    │
-    ├── services/
-    │   └── geminiService.js              # Comunicação com API Gemini
-    │
-    ├── hooks/
-    │   ├── useTypewriter.js              # Hook de animação typewriter
-    │   └── useEdson.js                   # Hook principal do assistente
-    │
-    └── components/
-        └── Edson/
-            ├── EdsonAvatar.jsx           # Avatar circular com iniciais "ED"
-            ├── EdsonMessage.jsx          # Mensagem individual no chat
-            ├── EdsonPanel.jsx            # Painel de chat expandível
-            ├── AskAiBar.jsx              # Barra Ask AI horizontal
-            ├── EdsonWidget.jsx           # Componente raiz (ponto de entrada)
-            └── edson.css                 # Todos os estilos do sistema
-```
-
----
-
-## Descrição Detalhada de Cada Arquivo
-
-### 1. `.env.example`
-Template com as variáveis de ambiente necessárias. O desenvolvedor copia para `.env` e preenche com suas credenciais.
-
-### 2. `src/utils/edsonHelpers.js`
-Funções utilitárias puras sem side effects:
-- **`generateMessageId()`** — gera ID único `msg-<timestamp>-<counter>` para cada mensagem
-- **`formatTimestamp(date)`** — formata Date para `HH:MM`
-- **`detectUserLevel(text)`** — analisa vocabulário e comprimento da pergunta para retornar `"iniciante"`, `"intermediario"` ou `"avancado"`
-- **`rotatePlaceholders()`** — retorna array de sugestões de perguntas para rotação no placeholder do input
-- **`sanitizeInput(text)`** — remove tags HTML e limita a 500 caracteres
-
-### 3. `src/services/geminiService.js`
-Serviço de comunicação com a API Google Gemini Flash 1.5:
-- Exporta `sendMessage(userMessage, conversationHistory)` → `Promise<string>`
-- Envia o system prompt do Edson em toda requisição via `system_instruction`
-- Limita o histórico às últimas N mensagens (`VITE_EDSON_MAX_HISTORY`)
-- Usa `AbortController` com timeout de 10 segundos
-- Trata erros: chave ausente, timeout, resposta vazia, erro HTTP
-
-### 4. `src/hooks/useTypewriter.js`
-Hook React para efeito typewriter:
-- `useTypewriter(text, speed)` → `{ displayedText, isTyping }`
-- Velocidade padrão: 18ms por caractere
-- Reinicia animação quando recebe novo texto
-- Limpa timeouts no unmount
-
-### 5. `src/hooks/useEdson.js`
-Hook principal que orquestra todo o estado:
-- `messages` — array de mensagens `{id, role, content, timestamp}`
-- `isLoading` — boolean durante chamada à API
-- `isOpen` — boolean do painel de chat
-- `inputValue` — valor do campo de texto
-- `sendMessage(text)` — fluxo completo: adiciona msg → loading → API → resposta
-- `togglePanel()` — abre/fecha o painel
-- `clearHistory()` — limpa tudo (visual + API)
-- `setInputValue(value)` — atualiza o campo
-
-### 6. `src/components/Edson/EdsonAvatar.jsx`
-Avatar circular do Edson:
-- Iniciais "ED" com gradiente azul → verde
-- Tamanho: `sm` (32px) ou `md` (40px)
-- Animação de pulse durante loading
-
-### 7. `src/components/Edson/EdsonMessage.jsx`
-Mensagem individual no chat:
-- Usuário: alinhada à direita, sem avatar
-- Edson: alinhada à esquerda, com EdsonAvatar
-- Texto do Edson usa `useTypewriter` quando `isLatest=true`
-- Cursor piscante `|` durante digitação
-- Timestamp `HH:MM` abaixo de cada mensagem
-
-### 8. `src/components/Edson/EdsonPanel.jsx`
-Painel de chat expandível:
-- Animação slide-down ao abrir
-- Scroll automático para a última mensagem
-- Altura máxima: 420px com overflow-y
-- Botão de limpar histórico (ícone de lixeira)
-- Estado vazio: mensagem de boas-vindas
-- Loading: três pontos animados (dots bounce)
-
-### 9. `src/components/Edson/AskAiBar.jsx`
-Barra Ask AI horizontal:
-- Avatar (40px) + label "Pergunte ao Edson" + input + botão enviar
-- Placeholder rotativo a cada 4 segundos
-- Click-outside fecha o painel
-- Form submit via Enter ou clique no botão
-- Spinner no botão durante loading
-- Backdrop blur + borda translúcida
-
-### 10. `src/components/Edson/EdsonWidget.jsx`
-Componente raiz que agrupa tudo:
-- Usa `useEdson()` internamente
-- Distribui props para `AskAiBar` e `EdsonPanel`
-- Único componente que o desenvolvedor precisa importar
-- Uso: `<EdsonWidget />` no topo da página
-
-### 11. `src/components/Edson/edson.css`
-Arquivo de estilos completo:
-- Variáveis CSS com fallback para dark e light mode (`data-theme`)
-- Keyframes: cursor-blink, slide-down, pulse-avatar, dots-bounce, spin, fade-in
-- Classes BEM: `.edson-bar`, `.edson-panel`, `.edson-message`, `.edson-avatar`
-- Responsivo: mobile-first com breakpoint em 768px
-
----
-
-## Fluxo Completo de Uma Mensagem
-
-```
-1.  Usuário digita no input da AskAiBar
-2.  AskAiBar chama useEdson.sendMessage(text)
-3.  useEdson sanitiza o input via sanitizeInput()
-4.  useEdson adiciona mensagem do usuário no array messages
-5.  useEdson seta isLoading = true
-6.  useEdson chama geminiService.sendMessage(text, conversationHistory)
-7.  geminiService monta payload com system_instruction + contents + generationConfig
-8.  geminiService faz POST para a API Gemini Flash 1.5 com AbortController (10s timeout)
-9.  geminiService extrai response.candidates[0].content.parts[0].text
-10. geminiService retorna o texto da resposta
-11. useEdson atualiza conversationHistory (formato Gemini)
-12. useEdson adiciona mensagem do Edson no array messages
-13. useEdson seta isLoading = false
-14. EdsonMessage recebe isLatest=true na última mensagem
-15. useTypewriter inicia animação caractere por caractere (18ms/char)
-16. Cursor piscante "|" aparece até isTyping virar false
-17. EdsonPanel faz scroll automático para a última mensagem
-```
-
----
-
-## Como Usar o EdsonWidget no Projeto
-
-O EdsonWidget já está integrado na `HomePage.jsx`. Para usar em outras páginas:
-
-```jsx
-import EdsonWidget from '@/components/Edson/EdsonWidget';
-
-export default function SuaPagina() {
-  return (
-    <div>
-      {/* Coloque acima do conteúdo principal */}
-      <EdsonWidget />
-
-      {/* Resto da página */}
-      <h1>Conteúdo da Página</h1>
-    </div>
-  );
-}
-```
-
----
-
-## Como Personalizar
-
-### Mudar o nome do assistente
-Edite o system prompt em `src/services/geminiService.js`:
-```js
-const SYSTEM_PROMPT = 'Você é NomeDoAssistente, um assistente digital...';
-```
-E as iniciais do avatar em `src/components/Edson/EdsonAvatar.jsx`:
-```jsx
-<span className="edson-avatar__initials">NA</span>
-```
-
-### Mudar o tom / personalidade
-Edite o `SYSTEM_PROMPT` em `src/services/geminiService.js`.
-
-### Mudar a velocidade do typewriter
-Edite `VITE_TYPEWRITER_SPEED` no `.env` (valor em ms).
-
-### Mudar as cores
-Edite as variáveis CSS em `src/components/Edson/edson.css`:
-```css
-.edson-widget {
-  --edson-accent: #38E67D;    /* cor de destaque */
-  --edson-primary: #023397;   /* cor primária */
-}
-```
-
----
-
-## Tratamento de Erros
-
-| Cenário | Comportamento | Resposta do Edson |
-|---------|---------------|-------------------|
-| Chave API ausente / inválida | `console.error` com instruções | "Desculpe, estou temporariamente indisponível." |
-| Timeout (>10s) | Cancela com AbortController | "A conexão demorou demais. Tente novamente." |
-| Resposta vazia da API | Log de erro silencioso | "Não consegui processar sua pergunta. Reformule?" |
-| Input vazio / só espaços | Ignora silenciosamente | (nenhuma ação) |
-| Histórico muito longo | Limita últimas N mensagens para API | (transparente para o usuário) |
-| Erro HTTP 400/403 | `console.error` com detalhes | "Desculpe, estou temporariamente indisponível." |
-| Erro de rede genérico | `console.error` | "Desculpe, estou temporariamente indisponível." |
-
----
-
-## Perguntas Frequentes
-
-**P: Preciso instalar alguma dependência?**
-R: Não, o sistema usa apenas React, que já está no projeto.
-
-**P: As mensagens são salvas no servidor?**
-R: Não, o histórico existe apenas na sessão do navegador (state React). Ao recarregar a página, o histórico é perdido.
-
-**P: Posso usar em produção?**
-R: Sim, mas certifique-se de proteger sua chave API (use um proxy/backend em produção para não expor a chave no frontend).
-
-**P: O Edson funciona sem internet?**
-R: Não, ele requer conexão com a API do Google Gemini.
-
-**P: Posso trocar o modelo de IA?**
-R: Sim, basta alterar o endpoint e o formato do payload em `geminiService.js`.
-
----
-
-## Próximos Passos Sugeridos
-
-1. **Proxy backend** — Criar uma rota de API no backend para não expor a chave Gemini no frontend
-2. **Persistência** — Salvar histórico no localStorage ou em banco de dados
-3. **Streaming** — Implementar a API de streaming do Gemini para respostas em tempo real
-4. **Contexto esportivo** — Enriquecer o system prompt com dados da partida sendo visualizada
-5. **Voice input** — Adicionar entrada por voz usando Web Speech API
-6. **Feedback** — Botões de 👍/👎 nas respostas para treinar melhor o assistente
-7. **Markdown** — Renderizar respostas com formatação Markdown (negrito, listas, etc.)
-8. **Testes** — Implementar testes unitários para `edsonHelpers.js` e `geminiService.js`
+Documento atualizado para refletir o estado atual da aplicação (frontend, backend e banco), com foco em clareza de propósito, funcionamento e manutenção.
