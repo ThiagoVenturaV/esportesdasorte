@@ -142,22 +142,5 @@ export const MOCK_UPCOMING_MATCHES = [
   }
 ];
 
-/** @type {Object.<string, MatchAnalysis>} */
-export const MOCK_ANALYSIS = {
-  'match-001': {
-    matchId: 'match-001',
-    winProbability: { home: 62, draw: 22, away: 16 },
-    goalProbabilityNextMinute: 28,
-    cardRiskHome: 35, cardRiskAway: 52, penaltyRisk: 18,
-    momentumHome: [60, 65, 70, 62, 58, 72, 75, 68, 63, 70, 74, 78, 72, 68, 73],
-    momentumAway: [40, 35, 30, 38, 42, 28, 25, 32, 37, 30, 26, 22, 28, 32, 27],
-    commentary: [
-      'Botafogo domina a posse de bola com 63% e pressiona a saída do adversário.',
-      'Santos tem dificuldade na transição — apenas 2 finalizações no primeiro tempo.',
-    ],
-    predictedWinner: 'Botafogo', confidenceScore: 74,
-  },
-};
-
 export const MOCK_OPEN_BETS = [];
 export const MOCK_FINISHED_BETS = [];
