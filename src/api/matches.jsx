@@ -1,5 +1,6 @@
 import { sportingFetch, sportingGenericFetch } from '@/services/sportingtech';
 import TeamShield from '@/components/TeamShield';
+import { BACKEND_URL } from '@/config/backend';
 import React from 'react';
 
 function extractTeamId(fixture, side) {
@@ -98,6 +99,46 @@ function mapFixtureToMatch(
   };
 }
 
+function mapLiveAnalysisToMatch(item, sportName = 'soccer') {
+  const homeName = item?.home_team || 'Home';
+  const awayName = item?.away_team || 'Away';
+  const liveData = item?.live_data || {};
+  const win = item?.analysis?.winProbability || {};
+
+  const toOdd = (probability, fallback) => {
+    const p = Number(probability);
+    if (!Number.isFinite(p) || p <= 0) return fallback;
+    return +Math.max(1.01, 100 / p).toFixed(2);
+  };
+
+  return {
+    id: String(item?.match_id || ''),
+    status: 'live',
+    sport: (sportName || 'soccer').toLowerCase(),
+    league: item?.league_name || 'Ao Vivo',
+    home: {
+      name: homeName,
+      shortName: homeName.substring(0, 3).toUpperCase(),
+      logo: <TeamShield name={homeName} externalId={String(item?.match_id || '')} />,
+    },
+    away: {
+      name: awayName,
+      shortName: awayName.substring(0, 3).toUpperCase(),
+      logo: <TeamShield name={awayName} externalId={String(item?.match_id || '')} />,
+    },
+    homeScore: Number(liveData?.home_score ?? 0),
+    awayScore: Number(liveData?.away_score ?? 0),
+    minute: `${Number(liveData?.minute ?? 0)}'`,
+    period: 'Ao Vivo',
+    odds: {
+      home: toOdd(win.home, 2.1),
+      draw: toOdd(win.draw, 3.3),
+      away: toOdd(win.away, 2.3),
+    },
+    markets: [],
+  };
+}
+
 /**
  * Returns all currently live matches.
  */
@@ -141,9 +182,32 @@ export async function getLiveMatches(filters = {}) {
       }
     }
 
+    // Tentativa 3: Backend DB-first (evita tela Live vazia quando Sportingtech falha no frontend)
+    if (matches.length === 0) {
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/analises-ao-vivo?limit=0`);
+        if (response.ok) {
+          const payload = await response.json();
+          if (payload?.sucesso && Array.isArray(payload.analises)) {
+            matches = payload.analises.map((item) =>
+              mapLiveAnalysisToMatch(item, filters.sport || 'soccer'),
+            );
+          }
+        }
+      } catch (e) {
+        console.warn('Live API attempt 3 (backend fallback) failed:', e);
+      }
+    }
+
     if (filters.sport) {
       matches = matches.filter(
         (m) => m.sport.toLowerCase() === filters.sport.toLowerCase(),
+      );
+    }
+
+    if (filters.league) {
+      matches = matches.filter((m) =>
+        m.league.toLowerCase().includes(filters.league.toLowerCase()),
       );
     }
 
