@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getMatchById } from '@/api/matches';
 import { getMatchAnalysis } from '@/api/analysis';
 import { ROUTES } from '@/config/routes';
+import TeamShield from '@/components/TeamShield';
 import {
   GoalIcon,
   YellowCardIcon,
@@ -21,21 +22,37 @@ import styles from './AnalysisPage.module.css';
  */
 export default function AnalysisPage() {
   const { matchId } = useParams();
+  const location = useLocation();
   const [match, setMatch] = useState(null);
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const preloadedLiveMatch = location.state?.preloadedLiveMatch ?? null;
+  const preloadedAnalysis = location.state?.preloadedAnalysis ?? null;
 
   useEffect(() => {
     let active = true;
 
     async function loadData() {
       setLoading(true);
-      const m = await getMatchById(matchId);
+
+      let m = null;
+      if (preloadedLiveMatch?.match_id && String(preloadedLiveMatch.match_id) === String(matchId)) {
+        m = mapLiveAnalysisToMatch(preloadedLiveMatch);
+      }
+
+      if (!m) {
+        m = await getMatchById(matchId);
+      }
+
       if (!active) return;
 
       setMatch(m);
 
-      const a = await getMatchAnalysis(matchId, m);
+      let a = preloadedAnalysis;
+      if (!a) {
+        a = await getMatchAnalysis(matchId, m);
+      }
       if (!active) return;
 
       setAnalysis(a);
@@ -47,7 +64,7 @@ export default function AnalysisPage() {
     return () => {
       active = false;
     };
-  }, [matchId]);
+  }, [matchId, preloadedLiveMatch, preloadedAnalysis]);
 
   if (loading) return <AnalysisSkeleton />;
 
@@ -235,6 +252,48 @@ export default function AnalysisPage() {
       </section>
     </div>
   );
+}
+
+function mapLiveAnalysisToMatch(liveMatch) {
+  const minuteRaw = liveMatch?.live_data?.minute;
+  const minute =
+    minuteRaw == null
+      ? ""
+      : String(minuteRaw).includes("'")
+        ? String(minuteRaw)
+        : `${minuteRaw}'`;
+
+  return {
+    id: String(liveMatch?.match_id || ''),
+    status: 'live',
+    sport: 'soccer',
+    league: 'Partida em Andamento',
+    home: {
+      name: liveMatch?.home_team || 'Casa',
+      shortName: String(liveMatch?.home_team || 'CAS').slice(0, 3).toUpperCase(),
+      logo: (
+        <TeamShield
+          name={liveMatch?.home_team || 'Casa'}
+          externalId={String(liveMatch?.match_id || '')}
+        />
+      ),
+    },
+    away: {
+      name: liveMatch?.away_team || 'Fora',
+      shortName: String(liveMatch?.away_team || 'FOR').slice(0, 3).toUpperCase(),
+      logo: (
+        <TeamShield
+          name={liveMatch?.away_team || 'Fora'}
+          externalId={String(liveMatch?.match_id || '')}
+        />
+      ),
+    },
+    homeScore: Number(liveMatch?.live_data?.home_score ?? 0),
+    awayScore: Number(liveMatch?.live_data?.away_score ?? 0),
+    minute,
+    period: 'Ao Vivo',
+    odds: { home: 0, draw: 0, away: 0 },
+  };
 }
 
 function TypewriterText({ text, startDelay = 0, speed = 25 }) {

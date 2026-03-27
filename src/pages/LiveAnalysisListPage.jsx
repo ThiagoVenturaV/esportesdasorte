@@ -135,7 +135,14 @@ function AnalysisCard({ match }) {
         <div className={styles.confidence}>
             Confiança: <span>{confidence}%</span>
         </div>
-        <Link to={ROUTES.ANALYSIS(match.match_id)} className={styles.detailBtn}>
+        <Link
+          to={ROUTES.ANALYSIS(match.match_id)}
+          state={{
+            preloadedLiveMatch: match,
+            preloadedAnalysis: analysis,
+          }}
+          className={styles.detailBtn}
+        >
           VER ANÁLISE COMPLETA →
         </Link>
       </div>

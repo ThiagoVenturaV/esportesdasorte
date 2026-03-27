@@ -99,6 +99,10 @@ export default function LiveMatchesCarousel() {
             <Link
               key={match.match_id}
               to={ROUTES.ANALYSIS(match.match_id)}
+              state={{
+                preloadedLiveMatch: match,
+                preloadedAnalysis: analysis,
+              }}
               className={styles.card}
               aria-label={`Ver análise de ${match.home_team} vs ${match.away_team}`}
             >
