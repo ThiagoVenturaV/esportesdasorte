@@ -5,7 +5,6 @@
  * Neon Database (Parquet historical data), and BetsAPI.
  */
 
-import { MOCK_ANALYSIS } from '@/config/mocks';
 import { BACKEND_URL } from '@/config/backend';
 
 /**
@@ -39,7 +38,6 @@ export async function getMatchAnalysis(matchId, matchContext = null) {
     return analysisData;
   } catch (error) {
     console.error('Error fetching AI analysis from backend:', error);
-    // Fallback securely to mock if backend is down
-    return MOCK_ANALYSIS[matchId] ?? MOCK_ANALYSIS['match-001'];
+    return null;
   }
 }
