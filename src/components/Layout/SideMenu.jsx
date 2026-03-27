@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '@/config/routes';
 import { BRAND } from '@/config/brand';
+import { SparkleIcon } from '@/components/Icons';
 import styles from './SideMenu.module.css';
 import logoSvg from '@/logo.svg';
 
@@ -72,6 +73,12 @@ export default function SideMenu({ isOpen, onClose }) {
             {/* Navigation */}
             <nav className={styles.navList} aria-label="Esportes">
               <MenuLink to={ROUTES.HOME} label="Home" icon={<HomeIcon />} onClick={onClose} />
+              <MenuLink 
+                to={ROUTES.LIVE_ANALYSIS} 
+                label="Análises Edson (LIVE)" 
+                icon={<SparkleIcon />} 
+                onClick={onClose} 
+              />
               {BRAND.sports.map((sport) => (
                 <MenuLink
                   key={sport.id}

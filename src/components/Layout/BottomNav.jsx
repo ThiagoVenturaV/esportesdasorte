@@ -5,6 +5,7 @@ import styles from './BottomNav.module.css';
 const NAV_ITEMS = [
   { to: ROUTES.HOME,    label: 'HOME',    Icon: HomeIcon    },
   { to: ROUTES.LIVE,    label: 'LIVE',    Icon: LiveIcon    },
+  { to: ROUTES.LIVE_ANALYSIS, label: 'IA', Icon: AIAnalysisIcon },
   { to: ROUTES.APOSTAS, label: 'APOSTAS', Icon: BetIcon     },
 ];
 
@@ -77,6 +78,14 @@ function BetIcon({ active }) {
         stroke={active ? '#38E67D' : 'currentColor'}
         strokeWidth="1.5"/>
       <path d="M7 5V4a4 4 0 018 0v1" stroke={active ? '#38E67D' : 'currentColor'} strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  );
+}
+function AIAnalysisIcon({ active }) {
+  const color = active ? '#38E67D' : 'currentColor';
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
     </svg>
   );
 }
