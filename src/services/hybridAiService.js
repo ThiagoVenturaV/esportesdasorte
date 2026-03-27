@@ -1,21 +1,44 @@
 /**
  * hybridAiService.js — O cérebro do Edson.
- * Decide qual motor de IA usar baseado na intenção do usuário:
- * - Groq: Respostas instantâneas para lógica e chat geral.
- * - Gemini: Consultas que exigem dados da web ou conhecimento atualizado.
+ * Estratégia anti-alucinação:
+ * - Padrão: sempre usar backend RAG (/api/chat) para ancorar no banco Neon.
+ * - Fallback Groq: opcional e desativado por padrão.
  */
 
 import { sendMessage as groqSendMessage } from './groqService';
 import { sendMessage as geminiSendMessage } from './geminiService';
 
-// Palavras-chave que sugerem necessidade de pesquisa web ou dados em tempo real
-const WEB_KEYWORDS = [
-  'pesquise', 'internet', 'google', 'web', 'notícias', 'hoje', 'agora', 'atualmente',
-  'search', 'online', 'clima', 'tempo', 'resultado de hoje', 'brasileirão', 'tabela',
-  'quem ganhou', 'placar', 'escalação', 'odds agora'
-];
+const ENABLE_GROQ_FALLBACK =
+  String(import.meta.env.VITE_ENABLE_GROQ_FALLBACK || 'false').toLowerCase() ===
+  'true';
 
-export async function sendMessage(userMessage, conversationHistory = [], onToken) {
-  console.info('[Edson] Usando Groq (Llama-3 Speed / Lógica)');
+function seemsBackendUnavailable(responseText = '') {
+  const text = String(responseText).toLowerCase();
+  return (
+    text.includes('temporariamente indisponível') ||
+    text.includes('não consigo me conectar ao backend') ||
+    text.includes('conexão demorou demais')
+  );
+}
+
+export async function sendMessage(
+  userMessage,
+  conversationHistory = [],
+  onToken,
+) {
+  console.info('[Edson] Usando Backend RAG (Neon + regras anti-alucinação)');
+  const backendResponse = await geminiSendMessage(
+    userMessage,
+    conversationHistory,
+  );
+
+  if (!ENABLE_GROQ_FALLBACK || !seemsBackendUnavailable(backendResponse)) {
+    if (onToken) onToken(backendResponse);
+    return backendResponse;
+  }
+
+  console.warn(
+    '[Edson] Backend indisponível. Fallback Groq habilitado por ENV.',
+  );
   return groqSendMessage(userMessage, conversationHistory, onToken);
 }

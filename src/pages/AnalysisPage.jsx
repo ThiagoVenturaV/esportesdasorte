@@ -4,7 +4,12 @@ import { motion } from 'framer-motion';
 import { getMatchById } from '@/api/matches';
 import { getMatchAnalysis } from '@/api/analysis';
 import { ROUTES } from '@/config/routes';
-import { GoalIcon, YellowCardIcon, RedCardIcon, SparkleIcon } from '@/components/Icons';
+import {
+  GoalIcon,
+  YellowCardIcon,
+  RedCardIcon,
+  SparkleIcon,
+} from '@/components/Icons';
 import ProbabilityBar from '@/components/Analysis/ProbabilityBar';
 import InsightCard from '@/components/Analysis/InsightCard';
 import MomentumChart from '@/components/Analysis/MomentumChart';
@@ -21,13 +26,27 @@ export default function AnalysisPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([getMatchById(matchId), getMatchAnalysis(matchId)]).then(
-      ([m, a]) => {
-        setMatch(m);
-        setAnalysis(a);
-        setLoading(false);
-      }
-    );
+    let active = true;
+
+    async function loadData() {
+      setLoading(true);
+      const m = await getMatchById(matchId);
+      if (!active) return;
+
+      setMatch(m);
+
+      const a = await getMatchAnalysis(matchId, m);
+      if (!active) return;
+
+      setAnalysis(a);
+      setLoading(false);
+    }
+
+    loadData();
+
+    return () => {
+      active = false;
+    };
   }, [matchId]);
 
   if (loading) return <AnalysisSkeleton />;
@@ -37,8 +56,13 @@ export default function AnalysisPage() {
       <div className={styles.page}>
         <div className={styles.errorCard}>
           <h2>Partida não encontrada</h2>
-          <p>Não foi possível carregar os dados desta partida. Ela pode ter sido encerrada ou removida.</p>
-          <Link to={ROUTES.HOME} className={styles.backLink}>← Ir para a Home</Link>
+          <p>
+            Não foi possível carregar os dados desta partida. Ela pode ter sido
+            encerrada ou removida.
+          </p>
+          <Link to={ROUTES.HOME} className={styles.backLink}>
+            ← Ir para a Home
+          </Link>
         </div>
       </div>
     );
@@ -49,8 +73,13 @@ export default function AnalysisPage() {
       <div className={styles.page}>
         <div className={styles.errorCard}>
           <h2>Análise Indisponível</h2>
-          <p>Nossos algoritmos de IA ainda não processaram os dados para {match.home.name} vs {match.away.name}.</p>
-          <Link to={-1} className={styles.backLink}>← Voltar</Link>
+          <p>
+            Nossos algoritmos de IA ainda não processaram os dados para{' '}
+            {match.home.name} vs {match.away.name}.
+          </p>
+          <Link to={-1} className={styles.backLink}>
+            ← Voltar
+          </Link>
         </div>
       </div>
     );
@@ -61,7 +90,9 @@ export default function AnalysisPage() {
   return (
     <div className={styles.page}>
       {/* Back navigation */}
-      <Link to={-1} className={styles.backLink}>← Voltar</Link>
+      <Link to={-1} className={styles.backLink}>
+        ← Voltar
+      </Link>
 
       {/* Match Header */}
       <motion.div
@@ -72,7 +103,8 @@ export default function AnalysisPage() {
         <div className={styles.headerTop}>
           <span className={styles.league}>{match.league}</span>
           <span className={styles.liveChip}>
-            <span className={styles.liveDot} aria-hidden="true" /> AO VIVO {match.minute}
+            <span className={styles.liveDot} aria-hidden="true" /> AO VIVO{' '}
+            {match.minute}
           </span>
         </div>
 
@@ -97,7 +129,9 @@ export default function AnalysisPage() {
           <div className={styles.predBadge}>
             <span className={styles.predLabel}>PREVISÃO IA</span>
             <span className={styles.predValue}>{analysis.predictedWinner}</span>
-            <span className={styles.predConf}>{analysis.confidenceScore}% confiança</span>
+            <span className={styles.predConf}>
+              {analysis.confidenceScore}% confiança
+            </span>
           </div>
 
           <Link to={ROUTES.BETTING(match.id)} className={styles.betCTA}>
@@ -119,9 +153,15 @@ export default function AnalysisPage() {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 1.5 }}
               >
-                <span className={styles.commentIcon}><SparkleIcon /></span>
+                <span className={styles.commentIcon}>
+                  <SparkleIcon />
+                </span>
                 <span className={styles.commentText}>
-                  <TypewriterText text={line} startDelay={i * 1500 + 400} speed={20} />
+                  <TypewriterText
+                    text={line}
+                    startDelay={i * 1500 + 400}
+                    speed={20}
+                  />
                 </span>
               </motion.li>
             ))}
@@ -191,15 +231,13 @@ export default function AnalysisPage() {
           />
         </div>
       </section>
-
-
     </div>
   );
 }
 
 function TypewriterText({ text, startDelay = 0, speed = 25 }) {
   const [displayed, setDisplayed] = useState('');
-  
+
   useEffect(() => {
     let timeout;
     let i = 0;
@@ -222,10 +260,22 @@ function TypewriterText({ text, startDelay = 0, speed = 25 }) {
 function AnalysisSkeleton() {
   return (
     <div className={styles.page}>
-      <div className={`skeleton ${styles.skH}`} style={{ height: 160, borderRadius: 16 }} />
-      <div className={`skeleton ${styles.skH}`} style={{ height: 80, borderRadius: 12 }} />
-      <div className={`skeleton ${styles.skH}`} style={{ height: 120, borderRadius: 12 }} />
-      <div className={`skeleton ${styles.skH}`} style={{ height: 160, borderRadius: 12 }} />
+      <div
+        className={`skeleton ${styles.skH}`}
+        style={{ height: 160, borderRadius: 16 }}
+      />
+      <div
+        className={`skeleton ${styles.skH}`}
+        style={{ height: 80, borderRadius: 12 }}
+      />
+      <div
+        className={`skeleton ${styles.skH}`}
+        style={{ height: 120, borderRadius: 12 }}
+      />
+      <div
+        className={`skeleton ${styles.skH}`}
+        style={{ height: 160, borderRadius: 12 }}
+      />
     </div>
   );
 }

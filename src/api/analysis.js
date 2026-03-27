@@ -1,49 +1,48 @@
 /**
- * analysis.js — Match Analysis API
+ * analysis.js — Match Analysis API (Backend Connected)
  *
- * Returns win probabilities, goal/card/penalty risk, momentum and AI commentary.
- * To use a real API: replace the body with a fetch() call.
- * Shape must remain identical so AnalysisPage never needs updating.
+ * Calls the Python backend (/api/analisar) which uses Gemini 2.5 Lite,
+ * Neon Database (Parquet historical data), and BetsAPI.
  */
 
 import { MOCK_ANALYSIS } from '@/config/mocks';
 
-const delay = (ms = 500) => new Promise((res) => setTimeout(res, ms));
+const BACKEND_URL = (
+  import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
+).replace(/\/$/, '');
 
 /**
- * Returns deep analysis for a match.
+ * Returns deep analysis for a match from the AI Backend.
  * @param {string} matchId
+ * @param {{ home?: { name?: string }, away?: { name?: string } } | null} matchContext
  * @returns {Promise<import('@/config/mocks').MatchAnalysis | null>}
  */
-export async function getMatchAnalysis(matchId) {
-  await delay(600);
-  
-  // If we have a specific mock for this ID (e.g. 'match-1')
-  if (MOCK_ANALYSIS[matchId]) {
-    return MOCK_ANALYSIS[matchId];
-  }
+export async function getMatchAnalysis(matchId, matchContext = null) {
+  try {
+    const params = new URLSearchParams();
+    if (matchContext?.home?.name)
+      params.set('home_team', matchContext.home.name);
+    if (matchContext?.away?.name)
+      params.set('away_team', matchContext.away.name);
+    const query = params.toString();
 
-  // If it's a numeric ID (Sportingtech real match) but no mock exists, 
-  // we generate a plausible "AI Analysis" structure to keep the UI functional.
-  if (!isNaN(Number(matchId))) {
-    return {
-      id: matchId,
-      predictedWinner: 'Equilíbrio Técnico',
-      confidenceScore: 72,
-      winProbability: { home: 38, draw: 28, away: 34 },
-      goalProbabilityNextMinute: 12,
-      cardRiskHome: 45,
-      cardRiskAway: 30,
-      penaltyRisk: 5,
-      momentumHome: [10, 20, 15, 40, 60, 55, 45, 50, 65, 70],
-      momentumAway: [5, 10, 25, 30, 20, 15, 40, 35, 30, 25],
-      commentary: [
-        "A IA detectou uma leve tendência ofensiva por parte da equipe mandante nos últimos 5 minutos.",
-        "O volume de jogo no meio campo sugere uma partida de transição rápida.",
-        "Atenção às bolas paradas: o índice de precisão em escanteios está acima da média."
-      ]
-    };
-  }
+    const response = await fetch(
+      `${BACKEND_URL}/api/analisar/${matchId}${query ? `?${query}` : ''}`,
+      {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      },
+    );
 
-  return null;
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const analysisData = await response.json();
+    return analysisData;
+  } catch (error) {
+    console.error('Error fetching AI analysis from backend:', error);
+    // Fallback securely to mock if backend is down
+    return MOCK_ANALYSIS[matchId] ?? MOCK_ANALYSIS['match-001'];
+  }
 }

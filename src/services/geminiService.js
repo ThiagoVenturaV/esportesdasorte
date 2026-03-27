@@ -1,64 +1,44 @@
 /**
- * geminiService.js — Serviço de comunicação com a API Google Gemini Flash 1.5.
- * Responsável por montar payload, enviar requisição e tratar erros.
- * Importado por: useEdson.js
+ * geminiService.js — Backend Connected Chat Service.
+ * Agora utiliza o nosso Backend em Python (/api/chat) que tem acesso ao Banco Neon,
+ * ao invés de bater diretamente na API do Google Gemini, permitindo injetar contexto RAG.
  */
 
-// ─── Constantes ─────────────────────────────────────────────────
+const BACKEND_URL = (
+  import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
+).replace(/\/$/, '');
+const TIMEOUT_MS = 15_000; // Maior tempo pois o backend pode consultar o DB
 
-const GEMINI_STREAM_ENDPOINT =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:streamGenerateContent';
-
-const SYSTEM_PROMPT =
-  'Você é Edson, o assistente virtual oficial da Esportes da Sorte (EDS). ' +
-  'Use pesquisa web para resultados e odds. ' +
-  'Sempre que sugerir uma aposta, use o formato: [[BET:Seleção|Odd|MatchId|Mercado]]. ' +
-  'Exemplo: "Confira essa odd do Flamengo: [[BET:Flamengo|1.95|72737684|Resultado Final]]". ' +
-  'Seja conciso, VIP e identifique-se como Edson da EDS.';
-
-const TIMEOUT_MS = 20_000;
 const MAX_HISTORY = parseInt(import.meta.env.VITE_EDSON_MAX_HISTORY, 10) || 10;
 
-function getApiKey() {
-  return import.meta.env.VITE_GEMINI_KEY;
-}
-
+/**
+ * Limita o histórico de conversa às últimas N mensagens (pares user/model).
+ */
 function trimHistory(history) {
-  const formatted = history.map(m => ({
-    role: m.role === 'assistant' || m.role === 'model' ? 'model' : 'user',
-    parts: [{ text: m.content || m.parts?.[0]?.text || '' }]
-  }));
-  return formatted.slice(-MAX_HISTORY);
+  if (history.length <= MAX_HISTORY) return history;
+  return history.slice(-MAX_HISTORY);
 }
 
 /**
- * Envia uma mensagem para o Gemini com suporte opcional a streaming.
+ * Envia uma mensagem do usuário para o Backend (que gerencia o Gemini e RAG).
+ *
+ * @param {string} userMessage - Mensagem digitada pelo usuário
+ * @param {Array} conversationHistory - Histórico no formato Gemini
+ * @returns {Promise<string>} Texto da resposta do Edson
  */
-export async function sendMessage(userMessage, conversationHistory = [], onToken) {
-  const apiKey = getApiKey();
-  if (!apiKey || apiKey === 'sua_chave_aqui') return 'Edson (Web) indisponível.';
-
-  const contents = [
-    ...trimHistory(conversationHistory),
-    { role: 'user', parts: [{ text: userMessage }] },
-  ];
+export async function sendMessage(userMessage, conversationHistory = []) {
+  const trimmedHistory = trimHistory(conversationHistory);
 
   const payload = {
-    contents,
-    system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-    tools: [{ google_search_retrieval: {} }],
-    generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 2048,
-    }
+    message: userMessage,
+    history: trimmedHistory,
   };
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    const url = `${GEMINI_STREAM_ENDPOINT}?key=${apiKey}`;
-    const response = await fetch(url, {
+    const response = await fetch(`${BACKEND_URL}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -68,61 +48,28 @@ export async function sendMessage(userMessage, conversationHistory = [], onToken
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('Gemini API Error:', response.status, errorData);
-      if (response.status === 429) return 'Edson (Web) está com muitas requisições. Tente em 1 minuto.';
-      return 'Erro na conexão com Edson (Web).';
-    }
-
-    // ── Resposta com Streaming (SSE simplificado para Gemini) ─────
-    if (onToken) {
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let fullText = '';
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        
-        // Gemini stream returns a JSON array: [ {...}, {...} ]
-        // We'll try to extract text parts safely
-        try {
-          // Remove the starting '[' and ending ']' or leading commas
-          const cleaned = buffer.replace(/^\[/, '').replace(/,$/, '').replace(/\]$/, '');
-          // This is a bit simplified, but Gemini usually emits one object per chunk
-          const chunks = cleaned.split('},{').map((c, i, a) => {
-             if (a.length === 1) return c;
-             if (i === 0) return c + '}';
-             if (i === a.length - 1) return '{' + c;
-             return '{' + c + '}';
-          });
-
-          for (const c of chunks) {
-            try {
-              const data = JSON.parse(c);
-              const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-              if (text && !fullText.endsWith(text)) {
-                fullText += text;
-                onToken(fullText);
-              }
-            } catch (e) { /* partial JSON, wait for next buffer */ }
-          }
-        } catch (e) {
-          console.warn('Buffer parsing error:', e);
-        }
-      }
-      return fullText || 'Edson não conseguiu processar a pesquisa agora.';
+      console.error(`[Edson] Backend retornou status ${response.status}`);
+      return 'Desculpe, estou temporariamente indisponível. Meu banco de dados (Neon) pode estar fora do ar.';
     }
 
     const data = await response.json();
-    return data?.[0]?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sem resposta.';
 
+    if (data.response) {
+      return data.response.trim();
+    }
+
+    return 'Não consegui processar sua pergunta. Reformule?';
   } catch (error) {
     clearTimeout(timeoutId);
-    console.error('Gemini Fetch Error:', error);
-    return 'Edson (Web) está offline no momento.';
+
+    if (error.name === 'AbortError') {
+      console.error(
+        '[Edson] Timeout: backend demorou para consultar o Neon/Gemini.',
+      );
+      return 'A conexão demorou demais. Tente novamente.';
+    }
+
+    console.error('[Edson] Erro de rede:', error.message);
+    return 'Desculpe, não consigo me conectar ao backend. Verifique se o servidor Python está rodando.';
   }
 }
