@@ -6,7 +6,7 @@
 
 ## Visão Geral do Sistema
 
-O Edson é um assistente digital inteligente embutido na interface do projeto **Esportes da Sorte**. Ele aparece como uma barra "Ask AI" acima do hero da HomePage, permitindo que o usuário faça perguntas em linguagem natural e receba respostas em tempo real com efeito de digitação (typewriter).
+O Edson é um assistente digital inteligente embutido na interface do projeto **Esportes da Sorte**. Ele aparece como uma barra "Ask AI" acima do hero da HomePage, permitindo que o usuário faça perguntas em linguagem natural e receba respostas em tempo real com efeito de digitação. (typewriter).
 
 **Características principais:**
 - 🤖 Alimentado pela API Google Gemini Flash 1.5
