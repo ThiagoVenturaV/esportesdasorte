@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ROUTES } from '@/config/routes';
 import { BRAND } from '@/config/brand';
+import { SparkleIcon } from '@/components/Icons';
 import styles from './DesktopSidebar.module.css';
 
 export default function DesktopSidebar() {
@@ -20,6 +21,11 @@ export default function DesktopSidebar() {
       {/* Navigation */}
       <nav className={styles.navList} aria-label="Esportes">
         <MenuLink to={ROUTES.HOME} label="Home" icon={<HomeIcon />} />
+        <MenuLink
+          to={ROUTES.LIVE_ANALYSIS}
+          label="Análises Edson (LIVE)"
+          icon={<SparkleIcon />}
+        />
         {BRAND.sports.map((sport) => (
           <MenuLink
             key={sport.id}
