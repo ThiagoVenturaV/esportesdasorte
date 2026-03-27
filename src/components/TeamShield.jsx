@@ -4,7 +4,9 @@ import { resolveShieldUrls } from '@/config/teamShields';
 const sportsDbBadgeCache = new Map();
 
 async function fetchSportsDbBadge(teamName) {
-  const normalized = String(teamName || '').trim().toLowerCase();
+  const normalized = String(teamName || '')
+    .trim()
+    .toLowerCase();
   if (!normalized) return null;
 
   if (sportsDbBadgeCache.has(normalized)) {
@@ -32,7 +34,7 @@ async function fetchSportsDbBadge(teamName) {
 /**
  * TeamShield Component
  * Renders the team crest using centralized mapping (API-Futebol primary).
- * 
+ *
  * @param {{ externalId: string, name: string, size?: number, className?: string }} props
  */
 export default function TeamShield({ externalId, name, size = 48, className }) {
@@ -40,7 +42,7 @@ export default function TeamShield({ externalId, name, size = 48, className }) {
   // Otherwise, we use the pixel size (default 40px)
   const finalWidth = size ? `${size}px` : '100%';
   const finalHeight = size ? `${size}px` : '100%';
-  
+
   // Ordered list of possible logos (CDN by id first, then mapped fallback).
   const shieldUrls = React.useMemo(
     () => resolveShieldUrls(name, externalId),
@@ -81,19 +83,19 @@ export default function TeamShield({ externalId, name, size = 48, className }) {
 
   if (!effectiveUrl) {
     return (
-      <div 
+      <div
         className={className}
-        style={{ 
-          width: finalWidth, 
-          height: finalHeight, 
-          backgroundColor: '#333', 
-          borderRadius: '50%', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
+        style={{
+          width: finalWidth,
+          height: finalHeight,
+          backgroundColor: '#333',
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           fontSize: '0.5em',
           color: '#fff',
-          flexShrink: 0
+          flexShrink: 0,
         }}
         title={name}
       >
@@ -116,13 +118,13 @@ export default function TeamShield({ externalId, name, size = 48, className }) {
         }
       }}
       className={className}
-      style={{ 
-        width: finalWidth, 
-        height: finalHeight, 
+      style={{
+        width: finalWidth,
+        height: finalHeight,
         objectFit: 'contain',
         display: 'inline-block',
         verticalAlign: 'middle',
-        flexShrink: 0
+        flexShrink: 0,
       }}
     />
   );

@@ -34,10 +34,10 @@ export default function DesktopSidebar() {
             icon={<span className={styles.emoji}>{sport.emoji}</span>}
           />
         ))}
-        <MenuLink 
-          to="#promocoes" 
-          label="Promoções (Em breve)" 
-          icon={<PromoIcon />} 
+        <MenuLink
+          to="#promocoes"
+          label="Promoções (Em breve)"
+          icon={<PromoIcon />}
           onClick={(e) => {
             e.preventDefault();
             alert('Promoções serão adicionadas em breve!');
@@ -59,24 +59,65 @@ function MenuLink({ to, label, icon, onClick }) {
 
 function SearchIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5"/>
-      <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
+      <path
+        d="M11 11l3 3"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
 function HomeIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 22 22" fill="none" aria-hidden="true">
-      <path d="M3 10.5L11 3l8 7.5V20a1 1 0 01-1 1H14v-5H8v5H4a1 1 0 01-1-1v-9.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 22 22"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M3 10.5L11 3l8 7.5V20a1 1 0 01-1 1H14v-5H8v5H4a1 1 0 01-1-1v-9.5z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
 function PromoIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 22 22" fill="none" aria-hidden="true">
-      <rect x="2" y="7" width="18" height="10" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-      <path d="M15 7V6a4 4 0 00-8 0v1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 22 22"
+      fill="none"
+      aria-hidden="true"
+    >
+      <rect
+        x="2"
+        y="7"
+        width="18"
+        height="10"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M15 7V6a4 4 0 00-8 0v1"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

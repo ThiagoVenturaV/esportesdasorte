@@ -37,7 +37,10 @@ export default function AnalysisPage() {
       setLoading(true);
 
       let m = null;
-      if (preloadedLiveMatch?.match_id && String(preloadedLiveMatch.match_id) === String(matchId)) {
+      if (
+        preloadedLiveMatch?.match_id &&
+        String(preloadedLiveMatch.match_id) === String(matchId)
+      ) {
         m = mapLiveAnalysisToMatch(preloadedLiveMatch);
       }
 
@@ -258,7 +261,7 @@ function mapLiveAnalysisToMatch(liveMatch) {
   const minuteRaw = liveMatch?.live_data?.minute;
   const minute =
     minuteRaw == null
-      ? ""
+      ? ''
       : String(minuteRaw).includes("'")
         ? String(minuteRaw)
         : `${minuteRaw}'`;
@@ -270,7 +273,9 @@ function mapLiveAnalysisToMatch(liveMatch) {
     league: liveMatch?.league_name || 'Partida em Andamento',
     home: {
       name: liveMatch?.home_team || 'Casa',
-      shortName: String(liveMatch?.home_team || 'CAS').slice(0, 3).toUpperCase(),
+      shortName: String(liveMatch?.home_team || 'CAS')
+        .slice(0, 3)
+        .toUpperCase(),
       logo: (
         <TeamShield
           name={liveMatch?.home_team || 'Casa'}
@@ -280,7 +285,9 @@ function mapLiveAnalysisToMatch(liveMatch) {
     },
     away: {
       name: liveMatch?.away_team || 'Fora',
-      shortName: String(liveMatch?.away_team || 'FOR').slice(0, 3).toUpperCase(),
+      shortName: String(liveMatch?.away_team || 'FOR')
+        .slice(0, 3)
+        .toUpperCase(),
       logo: (
         <TeamShield
           name={liveMatch?.away_team || 'Fora'}

@@ -42,7 +42,8 @@ export default function LiveAnalysisListPage() {
           <h1>Análises do Edson IA</h1>
         </div>
         <p className={styles.subtitle}>
-          Acompanhe probabilidades em tempo real e insights táticos gerados por nossa IA.
+          Acompanhe probabilidades em tempo real e insights táticos gerados por
+          nossa IA.
         </p>
       </header>
 
@@ -55,8 +56,13 @@ export default function LiveAnalysisListPage() {
         <div className={styles.emptyState}>
           <div className={styles.emptyIcon}>⚽</div>
           <h2>Sem jogos ao vivo agora</h2>
-          <p>Não há partidas com análise ativa no momento. Tente novamente em instantes.</p>
-          <Link to={ROUTES.HOME} className={styles.homeBtn}>Voltar para Início</Link>
+          <p>
+            Não há partidas com análise ativa no momento. Tente novamente em
+            instantes.
+          </p>
+          <Link to={ROUTES.HOME} className={styles.homeBtn}>
+            Voltar para Início
+          </Link>
         </div>
       ) : (
         <div className={styles.grid}>
@@ -74,9 +80,9 @@ function AnalysisCard({ match }) {
   const win = analysis.winProbability || { home: 33, draw: 33, away: 34 };
   const confidence = analysis.confidenceScore ?? 0;
   const leagueName = match.league_name || 'Partida em Andamento';
-  
+
   return (
-    <motion.div 
+    <motion.div
       className={styles.card}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
@@ -92,9 +98,13 @@ function AnalysisCard({ match }) {
           <span className={styles.teamName}>{match.home_team}</span>
         </div>
         <div className={styles.scoreBox}>
-          <span className={styles.score}>{match.live_data?.home_score ?? 0}</span>
+          <span className={styles.score}>
+            {match.live_data?.home_score ?? 0}
+          </span>
           <span className={styles.scoreSep}>-</span>
-          <span className={styles.score}>{match.live_data?.away_score ?? 0}</span>
+          <span className={styles.score}>
+            {match.live_data?.away_score ?? 0}
+          </span>
         </div>
         <div className={styles.teamInfo}>
           <span className={styles.teamName}>{match.away_team}</span>
@@ -105,21 +115,30 @@ function AnalysisCard({ match }) {
         <div className={styles.gaugeItem}>
           <span className={styles.gaugeLabel}>CASA</span>
           <div className={styles.gaugeBarWrap}>
-            <div className={styles.gaugeFill} style={{ width: `${win.home}%`, background: 'var(--brand-main)' }} />
+            <div
+              className={styles.gaugeFill}
+              style={{ width: `${win.home}%`, background: 'var(--brand-main)' }}
+            />
           </div>
           <span className={styles.gaugeVal}>{win.home}%</span>
         </div>
         <div className={styles.gaugeItem}>
           <span className={styles.gaugeLabel}>EMPATE</span>
           <div className={styles.gaugeBarWrap}>
-            <div className={styles.gaugeFill} style={{ width: `${win.draw}%`, background: '#666' }} />
+            <div
+              className={styles.gaugeFill}
+              style={{ width: `${win.draw}%`, background: '#666' }}
+            />
           </div>
           <span className={styles.gaugeVal}>{win.draw}%</span>
         </div>
         <div className={styles.gaugeItem}>
           <span className={styles.gaugeLabel}>FORA</span>
           <div className={styles.gaugeBarWrap}>
-            <div className={styles.gaugeFill} style={{ width: `${win.away}%`, background: 'var(--brand-sec)' }} />
+            <div
+              className={styles.gaugeFill}
+              style={{ width: `${win.away}%`, background: 'var(--brand-sec)' }}
+            />
           </div>
           <span className={styles.gaugeVal}>{win.away}%</span>
         </div>
@@ -134,7 +153,7 @@ function AnalysisCard({ match }) {
 
       <div className={styles.cardFooter}>
         <div className={styles.confidence}>
-            Confiança: <span>{confidence}%</span>
+          Confiança: <span>{confidence}%</span>
         </div>
         <Link
           to={ROUTES.ANALYSIS(match.match_id)}
