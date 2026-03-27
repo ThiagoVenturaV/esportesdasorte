@@ -73,6 +73,7 @@ function AnalysisCard({ match }) {
   const analysis = match.analysis || {};
   const win = analysis.winProbability || { home: 33, draw: 33, away: 34 };
   const confidence = analysis.confidenceScore ?? 0;
+  const leagueName = match.league_name || 'Partida em Andamento';
   
   return (
     <motion.div 
@@ -82,7 +83,7 @@ function AnalysisCard({ match }) {
       whileHover={{ y: -4 }}
     >
       <div className={styles.cardHeader}>
-        <span className={styles.leagueName}>Partida em Andamento</span>
+        <span className={styles.leagueName}>{leagueName}</span>
         <span className={styles.minuteBadge}>{match.live_data?.minute}'</span>
       </div>
 

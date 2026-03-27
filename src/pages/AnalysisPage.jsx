@@ -267,7 +267,7 @@ function mapLiveAnalysisToMatch(liveMatch) {
     id: String(liveMatch?.match_id || ''),
     status: 'live',
     sport: 'soccer',
-    league: 'Partida em Andamento',
+    league: liveMatch?.league_name || 'Partida em Andamento',
     home: {
       name: liveMatch?.home_team || 'Casa',
       shortName: String(liveMatch?.home_team || 'CAS').slice(0, 3).toUpperCase(),
