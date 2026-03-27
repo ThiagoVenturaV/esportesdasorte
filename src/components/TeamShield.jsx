@@ -1,7 +1,108 @@
 import React from 'react';
 import { resolveShieldUrls } from '@/config/teamShields';
 
+const betanoBadgeCache = new Map();
 const sportsDbBadgeCache = new Map();
+
+const BETANO_API_CANDIDATES = [
+  '/betano-api/api/sport/teams/search',
+  '/betano-api/api/sport/search/teams',
+  'https://www.betano.bet.br/api/sport/teams/search',
+  'https://www.betano.bet.br/api/sport/search/teams',
+];
+
+function asAbsoluteBetanoUrl(url) {
+  if (!url || typeof url !== 'string') return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('//')) return `https:${url}`;
+  if (url.startsWith('/')) return `https://www.betano.bet.br${url}`;
+  return null;
+}
+
+function findLogoLikeField(payload) {
+  if (!payload) return null;
+
+  if (typeof payload === 'string') {
+    if (/\.(png|svg|webp|jpg|jpeg)(\?|$)/i.test(payload)) {
+      return asAbsoluteBetanoUrl(payload) || payload;
+    }
+    return null;
+  }
+
+  if (Array.isArray(payload)) {
+    for (const item of payload) {
+      const found = findLogoLikeField(item);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  if (typeof payload === 'object') {
+    const keysByPriority = [
+      'logo',
+      'logoUrl',
+      'logo_url',
+      'crest',
+      'crestUrl',
+      'badge',
+      'badgeUrl',
+      'image',
+      'imageUrl',
+      'icon',
+      'iconUrl',
+    ];
+
+    for (const key of keysByPriority) {
+      const value = payload?.[key];
+      const found = findLogoLikeField(value);
+      if (found) return found;
+    }
+
+    for (const value of Object.values(payload)) {
+      const found = findLogoLikeField(value);
+      if (found) return found;
+    }
+  }
+
+  return null;
+}
+
+async function fetchBetanoBadge(teamName) {
+  const normalized = String(teamName || '')
+    .trim()
+    .toLowerCase();
+  if (!normalized) return null;
+
+  if (betanoBadgeCache.has(normalized)) {
+    return betanoBadgeCache.get(normalized);
+  }
+
+  for (const endpoint of BETANO_API_CANDIDATES) {
+    try {
+      const url = `${endpoint}?query=${encodeURIComponent(teamName)}`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json, text/plain, */*',
+        },
+      });
+
+      if (!response.ok) continue;
+
+      const data = await response.json();
+      const badge = findLogoLikeField(data);
+      if (badge) {
+        betanoBadgeCache.set(normalized, badge);
+        return badge;
+      }
+    } catch {
+      // Keep trying the next known Betano endpoint candidate.
+    }
+  }
+
+  betanoBadgeCache.set(normalized, null);
+  return null;
+}
 
 async function fetchSportsDbBadge(teamName) {
   const normalized = String(teamName || '')
@@ -50,18 +151,22 @@ export default function TeamShield({ externalId, name, size = 48, className }) {
   );
   const [activeIndex, setActiveIndex] = React.useState(0);
   const [primarySourcesFailed, setPrimarySourcesFailed] = React.useState(false);
+  const [betanoBadgeUrl, setBetanoBadgeUrl] = React.useState(null);
   const [sportsDbBadgeUrl, setSportsDbBadgeUrl] = React.useState(null);
   const [lookupAttempted, setLookupAttempted] = React.useState(false);
 
   React.useEffect(() => {
     setActiveIndex(0);
     setPrimarySourcesFailed(false);
+    setBetanoBadgeUrl(null);
     setSportsDbBadgeUrl(null);
     setLookupAttempted(false);
   }, [shieldUrls]);
 
   const resolvedUrl = shieldUrls[activeIndex] || null;
-  const effectiveUrl = primarySourcesFailed ? sportsDbBadgeUrl : resolvedUrl;
+  const effectiveUrl = primarySourcesFailed
+    ? betanoBadgeUrl || sportsDbBadgeUrl
+    : resolvedUrl;
 
   React.useEffect(() => {
     let cancelled = false;
@@ -69,6 +174,13 @@ export default function TeamShield({ externalId, name, size = 48, className }) {
     async function runLookup() {
       if (!primarySourcesFailed || !name || lookupAttempted) return;
       setLookupAttempted(true);
+
+      const betanoBadge = await fetchBetanoBadge(name);
+      if (!cancelled && betanoBadge) {
+        setBetanoBadgeUrl(betanoBadge);
+        return;
+      }
+
       const badge = await fetchSportsDbBadge(name);
       if (!cancelled && badge) {
         setSportsDbBadgeUrl(badge);

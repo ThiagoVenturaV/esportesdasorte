@@ -3,6 +3,103 @@ import TeamShield from '@/components/TeamShield';
 import { BACKEND_URL } from '@/config/backend';
 import React from 'react';
 
+const LIVE_MATCHES_CACHE_KEY = 'eds_live_matches_cache_v1';
+const LIVE_MATCHES_CACHE_TTL_MS = 45 * 1000;
+
+function canUseBrowserCache() {
+  return typeof window !== 'undefined' && !!window.sessionStorage;
+}
+
+function normalizeCacheFilters(filters = {}) {
+  return {
+    sport: String(filters?.sport || '').toLowerCase(),
+    league: String(filters?.league || '').toLowerCase(),
+  };
+}
+
+function readLiveMatchesCache(filters = {}) {
+  if (!canUseBrowserCache()) return null;
+
+  try {
+    const raw = window.sessionStorage.getItem(LIVE_MATCHES_CACHE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    const isExpired =
+      Date.now() - Number(parsed?.timestamp || 0) > LIVE_MATCHES_CACHE_TTL_MS;
+    if (isExpired) {
+      window.sessionStorage.removeItem(LIVE_MATCHES_CACHE_KEY);
+      return null;
+    }
+
+    const expectedFilters = normalizeCacheFilters(filters);
+    const cachedFilters = normalizeCacheFilters(parsed?.filters || {});
+    if (
+      expectedFilters.sport !== cachedFilters.sport ||
+      expectedFilters.league !== cachedFilters.league
+    ) {
+      return null;
+    }
+
+    if (!Array.isArray(parsed?.matches)) return null;
+
+    return parsed.matches.map((match) => ({
+      ...match,
+      home: {
+        ...match.home,
+        logo: (
+          <TeamShield
+            name={match?.home?.name || 'Home'}
+            externalId={String(match?.home?.externalId || match?.id || '')}
+          />
+        ),
+      },
+      away: {
+        ...match.away,
+        logo: (
+          <TeamShield
+            name={match?.away?.name || 'Away'}
+            externalId={String(match?.away?.externalId || match?.id || '')}
+          />
+        ),
+      },
+    }));
+  } catch (error) {
+    console.warn('Failed to read live matches cache:', error);
+    return null;
+  }
+}
+
+function writeLiveMatchesCache(filters = {}, matches = []) {
+  if (!canUseBrowserCache()) return;
+  if (!Array.isArray(matches)) return;
+
+  try {
+    const serializableMatches = matches.map((match) => ({
+      ...match,
+      home: {
+        ...match.home,
+        logo: null,
+      },
+      away: {
+        ...match.away,
+        logo: null,
+      },
+    }));
+
+    window.sessionStorage.setItem(
+      LIVE_MATCHES_CACHE_KEY,
+      JSON.stringify({
+        timestamp: Date.now(),
+        filters: normalizeCacheFilters(filters),
+        matches: serializableMatches,
+      }),
+    );
+  } catch (error) {
+    console.warn('Failed to write live matches cache:', error);
+  }
+}
+
 function extractTeamId(fixture, side) {
   const isHome = side === 'home';
   const candidateKeys = isHome
@@ -40,6 +137,8 @@ function mapFixtureToMatch(
   const period = mDat.st || (f.fStId > 1 ? 'Ao Vivo' : 'Em breve');
 
   let odds = { home: 0, draw: 0, away: 0 };
+  const homeId = extractTeamId(f, 'home');
+  const awayId = extractTeamId(f, 'away');
 
   if (f.btgs) {
     const mainBtg = f.btgs.find(
@@ -71,16 +170,14 @@ function mapFixtureToMatch(
     home: {
       name: homeName,
       shortName: homeName.substring(0, 3).toUpperCase(),
-      logo: (
-        <TeamShield name={homeName} externalId={extractTeamId(f, 'home')} />
-      ),
+      externalId: homeId,
+      logo: <TeamShield name={homeName} externalId={homeId} />,
     },
     away: {
       name: awayName,
       shortName: awayName.substring(0, 3).toUpperCase(),
-      logo: (
-        <TeamShield name={awayName} externalId={extractTeamId(f, 'away')} />
-      ),
+      externalId: awayId,
+      logo: <TeamShield name={awayName} externalId={awayId} />,
     },
     homeScore,
     awayScore,
@@ -102,6 +199,7 @@ function mapFixtureToMatch(
 function mapLiveAnalysisToMatch(item, sportName = 'soccer') {
   const homeName = item?.home_team || 'Home';
   const awayName = item?.away_team || 'Away';
+  const matchId = String(item?.match_id || '');
   const liveData = item?.live_data || {};
   const win = item?.analysis?.winProbability || {};
 
@@ -112,19 +210,21 @@ function mapLiveAnalysisToMatch(item, sportName = 'soccer') {
   };
 
   return {
-    id: String(item?.match_id || ''),
+    id: matchId,
     status: 'live',
     sport: (sportName || 'soccer').toLowerCase(),
     league: item?.league_name || 'Ao Vivo',
     home: {
       name: homeName,
       shortName: homeName.substring(0, 3).toUpperCase(),
-      logo: <TeamShield name={homeName} externalId={String(item?.match_id || '')} />,
+      externalId: `${matchId}-home`,
+      logo: <TeamShield name={homeName} externalId={`${matchId}-home`} />,
     },
     away: {
       name: awayName,
       shortName: awayName.substring(0, 3).toUpperCase(),
-      logo: <TeamShield name={awayName} externalId={String(item?.match_id || '')} />,
+      externalId: `${matchId}-away`,
+      logo: <TeamShield name={awayName} externalId={`${matchId}-away`} />,
     },
     homeScore: Number(liveData?.home_score ?? 0),
     awayScore: Number(liveData?.away_score ?? 0),
@@ -144,6 +244,11 @@ function mapLiveAnalysisToMatch(item, sportName = 'soccer') {
  */
 export async function getLiveMatches(filters = {}) {
   try {
+    const cachedMatches = readLiveMatchesCache(filters);
+    if (cachedMatches) {
+      return cachedMatches;
+    }
+
     let matches = [];
 
     // Tentativa 1: live-fixture (Endpoint principal de produção)
@@ -185,7 +290,9 @@ export async function getLiveMatches(filters = {}) {
     // Tentativa 3: Backend DB-first (evita tela Live vazia quando Sportingtech falha no frontend)
     if (matches.length === 0) {
       try {
-        const response = await fetch(`${BACKEND_URL}/api/analises-ao-vivo?limit=0`);
+        const response = await fetch(
+          `${BACKEND_URL}/api/analises-ao-vivo?limit=0`,
+        );
         if (response.ok) {
           const payload = await response.json();
           if (payload?.sucesso && Array.isArray(payload.analises)) {
@@ -210,6 +317,8 @@ export async function getLiveMatches(filters = {}) {
         m.league.toLowerCase().includes(filters.league.toLowerCase()),
       );
     }
+
+    writeLiveMatchesCache(filters, matches);
 
     return matches;
   } catch (error) {

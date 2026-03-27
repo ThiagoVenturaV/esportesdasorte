@@ -35,7 +35,13 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/bragi/, ''),
-      }
-    }
+      },
+      '/betano-api': {
+        target: 'https://www.betano.bet.br',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/betano-api/, ''),
+      },
+    },
   },
 });
