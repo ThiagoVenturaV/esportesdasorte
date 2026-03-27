@@ -1,5 +1,5 @@
 import React from 'react';
-import { resolveShieldUrl } from '@/config/teamShields';
+import { resolveShieldUrls } from '@/config/teamShields';
 
 /**
  * TeamShield Component
@@ -13,8 +13,18 @@ export default function TeamShield({ externalId, name, size = 48, className }) {
   const finalWidth = size ? `${size}px` : '100%';
   const finalHeight = size ? `${size}px` : '100%';
   
-  // Resolve URL using name or externalId hash
-  const resolvedUrl = resolveShieldUrl(name, externalId);
+  // Ordered list of possible logos (CDN by id first, then mapped fallback).
+  const shieldUrls = React.useMemo(
+    () => resolveShieldUrls(name, externalId),
+    [name, externalId],
+  );
+  const [activeIndex, setActiveIndex] = React.useState(0);
+
+  React.useEffect(() => {
+    setActiveIndex(0);
+  }, [shieldUrls]);
+
+  const resolvedUrl = shieldUrls[activeIndex] || null;
 
   if (!resolvedUrl) {
     return (
@@ -44,6 +54,12 @@ export default function TeamShield({ externalId, name, size = 48, className }) {
       src={resolvedUrl}
       alt={name}
       loading="lazy"
+      onError={() => {
+        // Tries the next source if current CDN/url fails.
+        if (activeIndex < shieldUrls.length - 1) {
+          setActiveIndex((prev) => prev + 1);
+        }
+      }}
       className={className}
       style={{ 
         width: finalWidth, 

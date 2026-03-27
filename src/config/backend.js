@@ -1,5 +1,5 @@
 const DEFAULT_PRODUCTION_BACKEND =
-  'https://esportesdasorte-production.up.railway.app';
+  'https://esportesdasorteback-production.up.railway.app';
 
 const DEFAULT_BACKEND_URL = import.meta.env.PROD
   ? DEFAULT_PRODUCTION_BACKEND

@@ -95,6 +95,50 @@ export const TEAM_SHIELDS = {
   'letonia': { url: 'https://flagcdn.com/w160/lv.png' },
 };
 
+function isNumericId(id) {
+  return typeof id === 'string' && /^\d{3,}$/.test(id);
+}
+
+function normalizeTeamName(teamName) {
+  return teamName
+    ?.toLowerCase()
+    ?.normalize('NFD')
+    ?.replace(/[\u0300-\u036f]/g, '');
+}
+
+function entryToUrl(entry) {
+  if (!entry) return null;
+  if (entry.url) return entry.url;
+  const path = entry.path || 'times/escudos';
+  return `https://cdn.api-futebol.com.br/${path}/${entry.hash}.${entry.ext}`;
+}
+
+/**
+ * Returns ordered shield URLs (best source first), so the UI can retry on image error.
+ * @param {string} teamName
+ * @param {string} [id]
+ * @returns {string[]}
+ */
+export function resolveShieldUrls(teamName, id) {
+  const urls = [];
+
+  // Preferred source for live/upcoming fixtures: Sportingtech CDN by numeric team id.
+  if (isNumericId(id)) {
+    urls.push(`https://img-cdn001.akamaized.net/ls/crest/medium/${id}.png`);
+  }
+
+  const name = normalizeTeamName(teamName);
+  const entryByName = TEAM_SHIELDS[name];
+  const entryById = TEAM_SHIELDS[id];
+
+  const mappedUrl = entryToUrl(entryByName || entryById);
+  if (mappedUrl) {
+    urls.push(mappedUrl);
+  }
+
+  return [...new Set(urls.filter(Boolean))];
+}
+
 /**
  * Resolves the shield URL for a given team name or external ID.
  * @param {string} teamName 
@@ -102,20 +146,5 @@ export const TEAM_SHIELDS = {
  * @returns {string | null}
  */
 export function resolveShieldUrl(teamName, id) {
-  const name = teamName?.toLowerCase()?.normalize("NFD")?.replace(/[\u0300-\u036f]/g, "");
-  const entry = TEAM_SHIELDS[name] || TEAM_SHIELDS[id];
-
-  if (entry) {
-    if (entry.url) return entry.url;
-    const path = entry.path || 'times/escudos';
-    return `https://cdn.api-futebol.com.br/${path}/${entry.hash}.${entry.ext}`;
-  }
-
-  // Fallback para o CDN do Sportingtech se tivermos um ID numérico válido
-  // O hcId/acId do Sportingtech mapeia diretamente para este CDN
-  if (id && !isNaN(id) && id.length > 2) {
-    return `https://img-cdn001.akamaized.net/ls/crest/medium/${id}.png`;
-  }
-
-  return null;
+  return resolveShieldUrls(teamName, id)[0] || null;
 }
