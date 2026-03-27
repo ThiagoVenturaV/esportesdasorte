@@ -24,6 +24,28 @@ npm run build      # bundle de produção
 npm run preview    # preview do bundle
 ```
 
+## Variáveis de Ambiente (Edson)
+
+O chat do Edson agora usa uma função serverless em `api/edson/chat` para proteger a chave da IA no backend.
+
+Crie um arquivo `.env` a partir de `.env.example`:
+
+```bash
+cp .env.example .env
+```
+
+Defina as variáveis:
+
+```env
+GROQ_API_KEY=chave_secreta_backend
+VITE_GROQ_KEY=chave_opcional_para_fallback_local
+VITE_EDSON_MAX_HISTORY=10
+VITE_TYPEWRITER_SPEED=18
+EDSON_MAX_HISTORY=10
+```
+
+No Vercel, configure pelo menos `GROQ_API_KEY` em `Settings > Environment Variables` e faça novo deploy.
+
 ---
 
 ## Estrutura de Pastas

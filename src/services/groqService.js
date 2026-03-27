@@ -17,6 +17,7 @@ const SYSTEM_PROMPT =
 
 const TIMEOUT_MS = 10_000;
 const MAX_HISTORY = parseInt(import.meta.env.VITE_EDSON_MAX_HISTORY, 10) || 10;
+const INTERNAL_CHAT_ENDPOINT = '/api/edson/chat';
 
 function getApiKey() {
   return import.meta.env.VITE_GROQ_KEY;
@@ -33,9 +34,34 @@ function formatHistory(history) {
 }
 
 export async function sendMessage(userMessage, conversationHistory = [], onToken) {
+  try {
+    const proxyResponse = await fetch(INTERNAL_CHAT_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userMessage,
+        conversationHistory,
+      }),
+    });
+
+    if (proxyResponse.ok) {
+      const proxyData = await proxyResponse.json();
+      const text = proxyData?.text || 'Sem resposta.';
+      if (onToken) onToken(text);
+      return text;
+    }
+
+    const proxyError = await proxyResponse.text().catch(() => '');
+    console.warn(`[Edson] Proxy interno indisponível (${proxyResponse.status}). Fallback local ativado.`, proxyError);
+  } catch (proxyError) {
+    console.warn('[Edson] Proxy interno indisponível. Fallback local ativado.', proxyError);
+  }
+
   const apiKey = getApiKey();
   if (!apiKey || apiKey === 'sua_chave_aqui') {
-    console.error('[Edson] Chave da API Groq não configurada em VITE_GROQ_KEY.');
+    console.error('[Edson] Chave da API Groq não configurada em GROQ_API_KEY (backend) ou VITE_GROQ_KEY (fallback local).');
     return 'Desculpe, estou temporariamente indisponível.';
   }
 
