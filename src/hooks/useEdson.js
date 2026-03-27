@@ -65,28 +65,42 @@ export function useEdson() {
       let currentResponse = '';
 
       // 6. Chama a API via hybridAiService com callback de streaming
-      const responseText = await hybridSendMessage(
+      const responsePayload = await hybridSendMessage(
         sanitized,
         conversationHistoryRef.current,
         (tokens) => {
           currentResponse = tokens;
           // Atualiza a mensagem do Edson em tempo real
           setMessages((prev) => {
-            const index = prev.findIndex(m => m.id === assistantMsgId);
+            const index = prev.findIndex((m) => m.id === assistantMsgId);
             if (index === -1) {
-              return [...prev, {
-                id: assistantMsgId,
-                role: 'assistant',
-                content: tokens,
-                timestamp: new Date()
-              }];
+              return [
+                ...prev,
+                {
+                  id: assistantMsgId,
+                  role: 'assistant',
+                  content: tokens,
+                  cta: null,
+                  timestamp: new Date(),
+                },
+              ];
             }
             const updated = [...prev];
             updated[index] = { ...updated[index], content: tokens };
             return updated;
           });
-        }
+        },
       );
+
+      const responseText =
+        typeof responsePayload === 'string'
+          ? responsePayload
+          : responsePayload?.text ||
+            'Não consegui processar sua pergunta. Reformule?';
+      const responseCta =
+        typeof responsePayload === 'string'
+          ? null
+          : responsePayload?.cta || null;
 
       // 7. Atualiza o histórico no formato interno (usando a resposta final)
       conversationHistoryRef.current = [
@@ -97,15 +111,27 @@ export function useEdson() {
 
       // Se por algum motivo o callback não foi chamado ou falhou, garante que a mensagem está lá
       setMessages((prev) => {
-        if (prev.some(m => m.id === assistantMsgId)) return prev;
-        return [...prev, {
-          id: assistantMsgId,
-          role: 'assistant',
-          content: responseText,
-          timestamp: new Date()
-        }];
+        const index = prev.findIndex((m) => m.id === assistantMsgId);
+        if (index >= 0) {
+          const updated = [...prev];
+          updated[index] = {
+            ...updated[index],
+            content: responseText,
+            cta: responseCta,
+          };
+          return updated;
+        }
+        return [
+          ...prev,
+          {
+            id: assistantMsgId,
+            role: 'assistant',
+            content: responseText,
+            cta: responseCta,
+            timestamp: new Date(),
+          },
+        ];
       });
-
     } catch (e) {
       console.error('[Edson Hook Error]', e);
       const errorMsg = {

@@ -23,7 +23,7 @@ function trimHistory(history) {
  *
  * @param {string} userMessage - Mensagem digitada pelo usuário
  * @param {Array} conversationHistory - Histórico no formato Gemini
- * @returns {Promise<string>} Texto da resposta do Edson
+ * @returns {Promise<{ text: string, cta: { label?: string, href?: string, variant?: string } | null }>}
  */
 export async function sendMessage(userMessage, conversationHistory = []) {
   const trimmedHistory = trimHistory(conversationHistory);
@@ -48,16 +48,25 @@ export async function sendMessage(userMessage, conversationHistory = []) {
 
     if (!response.ok) {
       console.error(`[Edson] Backend retornou status ${response.status}`);
-      return 'Desculpe, estou temporariamente indisponível. Meu banco de dados (Neon) pode estar fora do ar.';
+      return {
+        text: 'Desculpe, estou temporariamente indisponível. Meu banco de dados (Neon) pode estar fora do ar.',
+        cta: null,
+      };
     }
 
     const data = await response.json();
 
     if (data.response) {
-      return data.response.trim();
+      return {
+        text: data.response.trim(),
+        cta: data.cta || null,
+      };
     }
 
-    return 'Não consegui processar sua pergunta. Reformule?';
+    return {
+      text: 'Não consegui processar sua pergunta. Reformule?',
+      cta: null,
+    };
   } catch (error) {
     clearTimeout(timeoutId);
 
@@ -65,10 +74,16 @@ export async function sendMessage(userMessage, conversationHistory = []) {
       console.error(
         '[Edson] Timeout: backend demorou para consultar o Neon/Gemini.',
       );
-      return 'A conexão demorou demais. Tente novamente.';
+      return {
+        text: 'A conexão demorou demais. Tente novamente.',
+        cta: null,
+      };
     }
 
     console.error('[Edson] Erro de rede:', error.message);
-    return 'Desculpe, não consigo me conectar ao backend. Verifique se o servidor Python está rodando.';
+    return {
+      text: 'Desculpe, não consigo me conectar ao backend. Verifique se o servidor Python está rodando.',
+      cta: null,
+    };
   }
 }

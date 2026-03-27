@@ -16,6 +16,10 @@ export async function sendMessage(
     userMessage,
     conversationHistory,
   );
-  if (onToken) onToken(backendResponse);
+  const text =
+    typeof backendResponse === 'string'
+      ? backendResponse
+      : backendResponse?.text || '';
+  if (onToken) onToken(text);
   return backendResponse;
 }

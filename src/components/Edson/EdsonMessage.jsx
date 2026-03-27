@@ -6,6 +6,7 @@
 
 import EdsonAvatar from './EdsonAvatar';
 import BetOptionChip from './BetOptionChip';
+import { Link } from 'react-router-dom';
 import { useTypewriter } from '@/hooks/useTypewriter';
 import { formatTimestamp } from '@/utils/edsonHelpers';
 import './edson.css';
@@ -26,12 +27,12 @@ export default function EdsonMessage({ message, isLatest = false }) {
   const renderContent = (text) => {
     const parts = text.split(betRegex);
     const result = [];
-    
+
     // O split com grupos de captura retorna: [texto, sel, odd, id, mkt, texto, ...]
     for (let i = 0; i < parts.length; i += 5) {
       // Adiciona o texto antes do marker
       result.push(<span key={`text-${i}`}>{parts[i]}</span>);
-      
+
       // Adiciona o chip se houver dados capturados
       if (parts[i + 1]) {
         result.push(
@@ -41,9 +42,9 @@ export default function EdsonMessage({ message, isLatest = false }) {
               name: parts[i + 1],
               odd: parts[i + 2],
               matchId: parts[i + 3],
-              market: parts[i + 4]
+              market: parts[i + 4],
             }}
-          />
+          />,
         );
       }
     }
@@ -51,7 +52,9 @@ export default function EdsonMessage({ message, isLatest = false }) {
   };
 
   return (
-    <div className={`edson-message ${isAssistant ? 'edson-message--assistant' : 'edson-message--user'}`}>
+    <div
+      className={`edson-message ${isAssistant ? 'edson-message--assistant' : 'edson-message--user'}`}
+    >
       {isAssistant && <EdsonAvatar size="sm" />}
 
       <div className="edson-message__bubble">
@@ -62,7 +65,18 @@ export default function EdsonMessage({ message, isLatest = false }) {
             renderContent(message.content)
           )}
         </div>
-        <span className="edson-message__time">{formatTimestamp(message.timestamp)}</span>
+        {isAssistant && message.cta?.href && message.cta?.label && (
+          <Link
+            to={message.cta.href}
+            className="edson-message__cta"
+            aria-label={message.cta.label}
+          >
+            {message.cta.label}
+          </Link>
+        )}
+        <span className="edson-message__time">
+          {formatTimestamp(message.timestamp)}
+        </span>
       </div>
     </div>
   );
@@ -77,4 +91,3 @@ function TypewriterContent({ text, parser }) {
     </>
   );
 }
-
