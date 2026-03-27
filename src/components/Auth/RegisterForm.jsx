@@ -4,6 +4,30 @@ import { ROUTES } from '@/config/routes';
 import { registerUser } from '@/services/authService';
 import styles from './RegisterForm.module.css';
 
+function digitsOnly(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function formatCpf(value) {
+  const digits = digitsOnly(value).slice(0, 11);
+  return digits
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+}
+
+function formatPhone(value) {
+  const digits = digitsOnly(value).slice(0, 11);
+  if (digits.length <= 10) {
+    return digits
+      .replace(/(\d{2})(\d)/, '($1) $2')
+      .replace(/(\d{4})(\d{1,4})$/, '$1-$2');
+  }
+  return digits
+    .replace(/(\d{2})(\d)/, '($1) $2')
+    .replace(/(\d{5})(\d{1,4})$/, '$1-$2');
+}
+
 /**
  * RegisterForm - Improved UX with Enter key navigation.
  */
@@ -30,6 +54,8 @@ export default function RegisterForm() {
       placeholder: 'NOME COMPLETO',
       type: 'text',
       Icon: UserIcon,
+      maxLength: 80,
+      autoComplete: 'name',
     },
     {
       name: 'email_usuario',
@@ -37,6 +63,8 @@ export default function RegisterForm() {
       placeholder: 'Endereço de E-mail',
       type: 'email',
       Icon: MailIcon,
+      maxLength: 120,
+      autoComplete: 'email',
     },
     {
       name: 'cpf_usuario',
@@ -44,6 +72,8 @@ export default function RegisterForm() {
       placeholder: '000.000.000-00',
       type: 'text',
       Icon: ShieldIcon,
+      maxLength: 14,
+      inputMode: 'numeric',
     },
     {
       name: 'dataNac_usuario',
@@ -58,6 +88,8 @@ export default function RegisterForm() {
       placeholder: 'RUA, NÚMERO, CIDADE',
       type: 'text',
       Icon: HomeIcon,
+      maxLength: 120,
+      autoComplete: 'street-address',
     },
     {
       name: 'telefone_usuario',
@@ -65,6 +97,9 @@ export default function RegisterForm() {
       placeholder: 'NÚMERO DE CELULAR',
       type: 'tel',
       Icon: PhoneIcon,
+      maxLength: 15,
+      inputMode: 'tel',
+      autoComplete: 'tel-national',
     },
     {
       name: 'senha_usuario',
@@ -72,6 +107,8 @@ export default function RegisterForm() {
       placeholder: 'Password',
       type: 'password',
       Icon: LockIcon,
+      maxLength: 64,
+      autoComplete: 'new-password',
     },
     {
       name: 'confirmar_senha',
@@ -79,6 +116,8 @@ export default function RegisterForm() {
       placeholder: '........',
       type: 'password',
       Icon: ShieldIcon,
+      maxLength: 64,
+      autoComplete: 'new-password',
     },
   ];
 
@@ -121,6 +160,29 @@ export default function RegisterForm() {
       return;
     }
 
+    const cpfDigits = digitsOnly(formData.cpf_usuario);
+    if (cpfDigits.length !== 11) {
+      setFeedback({ type: 'error', message: 'CPF deve conter 11 dígitos.' });
+      return;
+    }
+
+    const phoneDigits = digitsOnly(formData.telefone_usuario);
+    if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+      setFeedback({
+        type: 'error',
+        message: 'Telefone deve conter 10 ou 11 dígitos.',
+      });
+      return;
+    }
+
+    if (formData.senha_usuario.length < 8) {
+      setFeedback({
+        type: 'error',
+        message: 'A senha deve ter no mínimo 8 caracteres.',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     setFeedback({ type: '', message: '' });
 
@@ -128,10 +190,10 @@ export default function RegisterForm() {
       const payload = {
         nome_usuario: formData.nome_usuario,
         email_usuario: formData.email_usuario,
-        cpf_usuario: formData.cpf_usuario,
+        cpf_usuario: cpfDigits,
         dataNac_usuario: formData.dataNac_usuario,
         endereco_usuario: formData.endereco_usuario,
-        telefone_usuario: formData.telefone_usuario,
+        telefone_usuario: phoneDigits,
         senha_usuario: formData.senha_usuario,
       };
 
@@ -158,7 +220,24 @@ export default function RegisterForm() {
 
   const handleChange = (event) => {
     const { name, value } = event.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    let nextValue = value;
+
+    if (name === 'cpf_usuario') {
+      nextValue = formatCpf(value);
+    } else if (name === 'telefone_usuario') {
+      nextValue = formatPhone(value);
+    } else if (name === 'nome_usuario') {
+      nextValue = value.slice(0, 80);
+    } else if (name === 'email_usuario') {
+      nextValue = value.trimStart().slice(0, 120);
+    } else if (name === 'endereco_usuario') {
+      nextValue = value.slice(0, 120);
+    } else if (name === 'senha_usuario' || name === 'confirmar_senha') {
+      nextValue = value.slice(0, 64);
+    }
+
+    setFormData((prev) => ({ ...prev, [name]: nextValue }));
   };
 
   return (
@@ -194,6 +273,9 @@ export default function RegisterForm() {
                 onChange={handleChange}
                 onKeyDown={(e) => handleKeyDown(e, i)}
                 autoFocus={i === 0}
+                maxLength={field.maxLength}
+                inputMode={field.inputMode}
+                autoComplete={field.autoComplete}
               />
             </div>
           </div>

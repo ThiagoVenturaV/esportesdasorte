@@ -1,4 +1,10 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from 'react-router-dom';
 import Layout from '@/components/Layout/Layout';
 import HomePage from '@/pages/HomePage';
 import LivePage from '@/pages/LivePage';
@@ -10,6 +16,9 @@ import RegisterPage from '@/pages/RegisterPage';
 import RegisterSuccessPage from '@/pages/RegisterSuccessPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import LiveAnalysisListPage from '@/pages/LiveAnalysisListPage';
+import AccountHomePage from '@/pages/AccountHomePage';
+import AccountSecurityPage from '@/pages/AccountSecurityPage';
+import RequireAuth from '@/components/Auth/RequireAuth';
 import { BetSlipProvider } from '@/components/BetSlip/BetSlipContext';
 import BetSlipModal from '@/components/BetSlip/BetSlipModal';
 import { ROUTES } from '@/config/routes';
@@ -24,19 +33,33 @@ function AppRoutes() {
       {/* Main app — uses backgroundLocation when modal is open so site stays visible */}
       <Routes location={backgroundLocation ?? location}>
         {/* Auth as full page (direct URL access, no background) */}
-        <Route path={ROUTES.LOGIN}           element={<LoginPage />} />
-        <Route path={ROUTES.REGISTER}        element={<RegisterPage />} />
-        <Route path={ROUTES.REGISTER_SUCCESS} element={<RegisterSuccessPage />} />
+        <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+        <Route path={ROUTES.REGISTER} element={<RegisterPage />} />
+        <Route
+          path={ROUTES.REGISTER_SUCCESS}
+          element={<RegisterSuccessPage />}
+        />
         <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
 
         {/* App with layout */}
         <Route element={<Layout />}>
-          <Route path={ROUTES.HOME}       element={<HomePage />}    />
-          <Route path={ROUTES.LIVE}       element={<LivePage />}    />
-          <Route path={ROUTES.APOSTAS}    element={<ApostasPage />} />
-          <Route path={ROUTES.LIVE_ANALYSIS} element={<LiveAnalysisListPage />} />
+          <Route path={ROUTES.HOME} element={<HomePage />} />
+          <Route path={ROUTES.LIVE} element={<LivePage />} />
+          <Route path={ROUTES.APOSTAS} element={<ApostasPage />} />
+          <Route
+            path={ROUTES.LIVE_ANALYSIS}
+            element={<LiveAnalysisListPage />}
+          />
           <Route path={ROUTES.ANALYSIS()} element={<AnalysisPage />} />
-          <Route path={ROUTES.BETTING()}  element={<MatchBettingPage />} />
+          <Route path={ROUTES.BETTING()} element={<MatchBettingPage />} />
+
+          <Route element={<RequireAuth />}>
+            <Route path={ROUTES.ACCOUNT} element={<AccountHomePage />} />
+            <Route
+              path={ROUTES.ACCOUNT_SECURITY}
+              element={<AccountSecurityPage />}
+            />
+          </Route>
         </Route>
 
         <Route path="*" element={<Navigate to={ROUTES.HOME} replace />} />
@@ -45,10 +68,16 @@ function AppRoutes() {
       {/* Modal overlay — rendered on top of site when navigating from within app */}
       {backgroundLocation && (
         <Routes>
-          <Route path={ROUTES.LOGIN}           element={<LoginPage />} />
-          <Route path={ROUTES.REGISTER}        element={<RegisterPage />} />
-          <Route path={ROUTES.REGISTER_SUCCESS} element={<RegisterSuccessPage />} />
-          <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
+          <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+          <Route path={ROUTES.REGISTER} element={<RegisterPage />} />
+          <Route
+            path={ROUTES.REGISTER_SUCCESS}
+            element={<RegisterSuccessPage />}
+          />
+          <Route
+            path={ROUTES.FORGOT_PASSWORD}
+            element={<ForgotPasswordPage />}
+          />
         </Routes>
       )}
 
@@ -67,4 +96,3 @@ export default function App() {
     </BetSlipProvider>
   );
 }
-

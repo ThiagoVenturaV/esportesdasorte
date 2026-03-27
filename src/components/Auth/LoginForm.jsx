@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '@/config/routes';
 import { loginUser } from '@/services/authService';
+import { saveCurrentUser } from '@/services/userSession';
 import styles from './LoginForm.module.css';
 
 /**
@@ -48,13 +49,14 @@ export default function LoginForm() {
       const result = await loginUser(formData);
       const user = result?.usuario || null;
       if (user) {
-        localStorage.setItem('eds_user', JSON.stringify(user));
+        saveCurrentUser(user);
       }
       setFeedback({
         type: 'success',
         message: result?.mensagem || 'Login realizado com sucesso.',
       });
-      navigate(ROUTES.HOME);
+      const nextRoute = location.state?.from || ROUTES.ACCOUNT;
+      navigate(nextRoute, { replace: true });
     } catch (error) {
       setFeedback({
         type: 'error',

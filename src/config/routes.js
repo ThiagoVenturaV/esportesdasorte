@@ -19,6 +19,8 @@ export const ROUTES = {
   REGISTER_SUCCESS: '/registro-sucesso',
   FORGOT_PASSWORD: '/recuperar-senha',
   LIVE_ANALYSIS: '/analises-ia',
+  ACCOUNT: '/minha-conta',
+  ACCOUNT_SECURITY: '/minha-conta/seguranca',
 
   // Dynamic routes — call as a function to get the path with param
   ANALYSIS: (matchId = ':matchId') => `/analise/${matchId}`,
