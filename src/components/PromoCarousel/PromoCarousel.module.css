@@ -1,0 +1,162 @@
+.carouselWrapper {
+  width: 100%;
+  margin: var(--space-4) 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  padding: 0 var(--space-4);
+}
+
+.carouselContainer {
+  display: flex;
+  width: 100%;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  border-radius: var(--radius-lg);
+}
+
+.carouselContainer::-webkit-scrollbar {
+  display: none;
+}
+
+.promoCard {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  min-height: 180px;
+  aspect-ratio: 16 / 9; /* Taller on mobile to show more content */
+  background-size: cover;
+  background-position: center 20%; /* Position the image slightly downwards to avoid clipping */
+  background-repeat: no-repeat;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  transition: transform var(--transition-base), filter var(--transition-base);
+}
+
+@media (min-width: 768px) {
+  .promoCard {
+    min-height: 220px;
+    aspect-ratio: 16 / 6; /* Correctly wide on desktop */
+  }
+}
+
+.promoCard:hover {
+  filter: brightness(1.1);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, rgba(0,0,0,0.2) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+/* Navigation Buttons */
+.navBtn {
+  position: absolute;
+  top: 40%; /* Position relative to card height */
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background: rgba(18, 18, 30, 0.8);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: var(--z-card);
+  transition: all var(--transition-fast);
+  opacity: 0; /* Hide by default on mobile */
+}
+
+@media (min-width: 768px) {
+  .navBtn {
+    opacity: 1;
+    width: 44px;
+    height: 44px;
+  }
+  
+  .navBtn:hover {
+    background: var(--color-accent);
+    color: #000;
+    border-color: var(--color-accent);
+    transform: translateY(-50%) scale(1.1);
+  }
+}
+
+.prevBtn {
+  left: var(--space-2);
+}
+
+.nextBtn {
+  right: var(--space-2);
+}
+
+.carouselWrapper:hover .navBtn {
+  opacity: 1;
+}
+
+.promoContent {
+  position: absolute;
+  left: var(--space-6);
+  bottom: var(--space-6);
+  z-index: 3;
+}
+
+.promoBtn {
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: #000;
+  font-weight: 800;
+  font-size: var(--font-size-sm);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(56, 230, 125, 0.3);
+  transition: all var(--transition-base);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+@media (min-width: 768px) {
+  .promoBtn:hover {
+    background: #fff;
+    transform: scale(1.05);
+    box-shadow: 0 6px 20px rgba(255, 255, 255, 0.4);
+  }
+}
+
+.promoBtn:active {
+  transform: scale(0.95);
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-border);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.activeDot {
+  background: var(--color-accent);
+  width: 16px;
+  border-radius: var(--radius-full);
+}
