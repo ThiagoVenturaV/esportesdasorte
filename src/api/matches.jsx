@@ -2,6 +2,22 @@ import { sportingFetch, sportingGenericFetch } from '@/services/sportingtech';
 import TeamShield from '@/components/TeamShield';
 import React from 'react';
 
+function extractTeamId(fixture, side) {
+  const isHome = side === 'home';
+  const candidateKeys = isHome
+    ? ['hcId', 'hId', 'homeId', 'homeCompetitorId', 'hcid', 'homeTeamId']
+    : ['acId', 'aId', 'awayId', 'awayCompetitorId', 'acid', 'awayTeamId'];
+
+  for (const key of candidateKeys) {
+    const value = fixture?.[key];
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      return String(value);
+    }
+  }
+
+  return String(fixture?.fId || '');
+}
+
 /**
  * Maps a Sportingtech fixture object to the internal Match format.
  */
@@ -54,12 +70,12 @@ function mapFixtureToMatch(
     home: {
       name: homeName,
       shortName: homeName.substring(0, 3).toUpperCase(),
-      logo: <TeamShield name={homeName} externalId={String(f.hcId || f.fId)} />,
+      logo: <TeamShield name={homeName} externalId={extractTeamId(f, 'home')} />,
     },
     away: {
       name: awayName,
       shortName: awayName.substring(0, 3).toUpperCase(),
-      logo: <TeamShield name={awayName} externalId={String(f.acId || f.fId)} />,
+      logo: <TeamShield name={awayName} externalId={extractTeamId(f, 'away')} />,
     },
     homeScore,
     awayScore,
