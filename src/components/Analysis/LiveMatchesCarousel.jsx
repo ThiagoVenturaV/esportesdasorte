@@ -17,7 +17,9 @@ export default function LiveMatchesCarousel() {
   const fetchAnalyses = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${BACKEND_URL}/api/analises-ao-vivo`);
+      const response = await fetch(
+        `${BACKEND_URL}/api/analises-ao-vivo?limit=8`,
+      );
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
@@ -64,7 +66,12 @@ export default function LiveMatchesCarousel() {
           <span className={styles.liveDot} aria-hidden="true" /> Jogos Ao Vivo —
           Análise IA
         </h2>
-        <span className={styles.powered}>Edson AI</span>
+        <div className={styles.headerRight}>
+          <span className={styles.powered}>Edson AI</span>
+          <Link to={ROUTES.LIVE} className={styles.seeAll}>
+            VER AO VIVO
+          </Link>
+        </div>
       </div>
 
       <div className={styles.carousel}>

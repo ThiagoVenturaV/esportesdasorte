@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { BACKEND_URL } from '@/config/backend';
@@ -12,17 +12,23 @@ import styles from './LiveAnalysisListPage.module.css';
 export default function LiveAnalysisListPage() {
   const [analyses, setAnalyses] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [leagueFilter, setLeagueFilter] = useState('all');
 
   const fetchAnalyses = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${BACKEND_URL}/api/analises-ao-vivo`);
+      const response = await fetch(
+        `${BACKEND_URL}/api/analises-ao-vivo?limit=0`,
+      );
       const data = await response.json();
       if (data?.sucesso && Array.isArray(data.analises)) {
         setAnalyses(data.analises);
+      } else {
+        setAnalyses([]);
       }
     } catch (error) {
       console.error('[LiveAnalysisList] Error fetching analyses:', error);
+      setAnalyses([]);
     } finally {
       setLoading(false);
     }
@@ -33,6 +39,35 @@ export default function LiveAnalysisListPage() {
     const interval = setInterval(fetchAnalyses, 60_000); // 1 min sync
     return () => clearInterval(interval);
   }, [fetchAnalyses]);
+
+  const leagueOptions = useMemo(() => {
+    const set = new Set();
+    analyses.forEach((match) => {
+      const name = String(match?.league_name || '').trim() || 'Outras Ligas';
+      set.add(name);
+    });
+    return [
+      'all',
+      ...Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    ];
+  }, [analyses]);
+
+  useEffect(() => {
+    if (leagueFilter !== 'all' && !leagueOptions.includes(leagueFilter)) {
+      setLeagueFilter('all');
+    }
+  }, [leagueFilter, leagueOptions]);
+
+  const filteredAnalyses = useMemo(() => {
+    if (leagueFilter === 'all') {
+      return analyses;
+    }
+    return analyses.filter((match) => {
+      const currentLeague =
+        String(match?.league_name || '').trim() || 'Outras Ligas';
+      return currentLeague === leagueFilter;
+    });
+  }, [analyses, leagueFilter]);
 
   return (
     <div className={styles.page}>
@@ -45,20 +80,48 @@ export default function LiveAnalysisListPage() {
           Acompanhe probabilidades em tempo real e insights táticos gerados por
           nossa IA.
         </p>
+        {!loading && analyses.length > 0 && (
+          <p className={styles.resultsMeta}>
+            {filteredAnalyses.length} jogos exibidos
+          </p>
+        )}
       </header>
 
-      {loading && analyses.length === 0 ? (
+      {leagueOptions.length > 1 && (
+        <div
+          className={styles.filters}
+          role="tablist"
+          aria-label="Filtrar por liga"
+        >
+          {leagueOptions.map((option) => {
+            const active = leagueFilter === option;
+            return (
+              <button
+                key={option}
+                type="button"
+                className={`${styles.filterChip} ${active ? styles.filterChipActive : ''}`}
+                onClick={() => setLeagueFilter(option)}
+                aria-pressed={active}
+              >
+                {option === 'all' ? 'Todas as ligas' : option}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {loading && filteredAnalyses.length === 0 ? (
         <div className={styles.loadingState}>
           <span className={styles.spinner} />
           <p>Consultando a rede neural do Edson...</p>
         </div>
-      ) : analyses.length === 0 ? (
+      ) : filteredAnalyses.length === 0 ? (
         <div className={styles.emptyState}>
           <div className={styles.emptyIcon}>⚽</div>
-          <h2>Sem jogos ao vivo agora</h2>
+          <h2>Sem jogos ao vivo para este filtro</h2>
           <p>
-            Não há partidas com análise ativa no momento. Tente novamente em
-            instantes.
+            Não há partidas com análise ativa para a liga selecionada no
+            momento. Tente outro filtro ou volte em instantes.
           </p>
           <Link to={ROUTES.HOME} className={styles.homeBtn}>
             Voltar para Início
@@ -66,7 +129,7 @@ export default function LiveAnalysisListPage() {
         </div>
       ) : (
         <div className={styles.grid}>
-          {analyses.map((match) => (
+          {filteredAnalyses.map((match) => (
             <AnalysisCard key={match.match_id} match={match} />
           ))}
         </div>

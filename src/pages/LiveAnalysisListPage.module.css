@@ -55,6 +55,43 @@
   font-size: 0.95rem;
 }
 
+.resultsMeta {
+  margin-top: 0.4rem;
+  color: var(--gray-400);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.filterChip {
+  border: 1px solid var(--gray-700);
+  background: var(--gray-800);
+  color: var(--gray-300);
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filterChip:hover {
+  border-color: var(--brand-main);
+  color: var(--white);
+}
+
+.filterChipActive {
+  border-color: var(--brand-main);
+  background: rgba(56, 230, 125, 0.12);
+  color: var(--white);
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
