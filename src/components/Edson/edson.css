@@ -375,6 +375,16 @@
   border-bottom: 1px solid var(--edson-border);
 }
 
+.edson-panel__disclaimer {
+  margin: 0;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--edson-border);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--edson-text-dim);
+  background: rgba(230, 56, 80, 0.05);
+}
+
 .edson-panel__title {
   display: flex;
   align-items: center;

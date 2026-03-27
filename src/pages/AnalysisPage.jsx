@@ -159,6 +159,11 @@ export default function AnalysisPage() {
             </span>
           </div>
 
+          <p className={styles.aiDisclaimer}>
+            Edson é uma IA e pode cometer erros. Por favor, verifique as
+            respostas.
+          </p>
+
           <div className={styles.betCTAWrapper}>
             <Link to={ROUTES.BETTING(match.id)} className={styles.betCTA}>
               APOSTAR AGORA

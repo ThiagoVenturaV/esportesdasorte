@@ -14,7 +14,9 @@
   width: fit-content;
 }
 
-.backLink:hover { color: var(--color-accent); }
+.backLink:hover {
+  color: var(--color-accent);
+}
 
 /* Match Header */
 .matchHeader {
@@ -32,7 +34,9 @@
 .matchHeader::before {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 3px;
   background: var(--color-gradient);
 }
@@ -55,7 +59,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  background: rgba(230,56,80,0.15);
+  background: rgba(230, 56, 80, 0.15);
   color: var(--color-live);
   font-size: var(--font-size-xs);
   font-weight: 700;
@@ -73,8 +77,13 @@
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.4; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 /* Scoreboard */
@@ -167,6 +176,19 @@
   opacity: 0.8;
 }
 
+.aiDisclaimer {
+  margin: 0;
+  padding: 8px 12px;
+  max-width: 560px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(230, 56, 80, 0.22);
+  background: rgba(230, 56, 80, 0.08);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
+  text-align: center;
+}
+
 .betCTAWrapper {
   display: flex;
   justify-content: center;
@@ -175,7 +197,7 @@
 }
 
 .betCTA {
-  background: #38E67D; /* Vibrante green from image */
+  background: #38e67d; /* Vibrante green from image */
   color: #000;
   padding: 16px 60px;
   border-radius: 99px;
