@@ -16,7 +16,12 @@ function seemsBackendUnavailable(responseText = '') {
   const text = String(responseText).toLowerCase();
   return (
     text.includes('temporariamente indisponível') ||
+    text.includes('temporariamente indisponivel') ||
+    text.includes('sem configuracao da ia no backend') ||
+    text.includes('modo de contingencia') ||
+    text.includes('erro ao consultar o contexto rag do edson') ||
     text.includes('não consigo me conectar ao backend') ||
+    text.includes('nao consigo me conectar ao backend') ||
     text.includes('conexão demorou demais')
   );
 }

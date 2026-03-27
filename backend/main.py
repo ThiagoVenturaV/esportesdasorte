@@ -221,7 +221,52 @@ def edson_chat(request: ChatRequest):
     Chat do Edson com contexto RAG vindo do banco Neon.
     """
     if not GEMINI_API_KEY:
-        return {"response": "Desculpe, o Edson esta temporariamente sem configuracao da IA no backend."}
+        try:
+            rag_context = rag_service.build_chat_rag_context(request.message, limit=5)
+            if rag_context:
+                exemplos = []
+                for item in rag_context[:3]:
+                    casa = item.get("time_casa", "?")
+                    fora = item.get("time_fora", "?")
+                    placar = item.get("placar", "?")
+                    exemplos.append(f"{casa} {placar} {fora}")
+
+                resposta_texto = (
+                    "Estou em modo de contingencia (IA generativa indisponivel no momento), "
+                    "mas ainda consigo te ajudar com os dados do banco. "
+                    "Partidas relacionadas encontradas: " + "; ".join(exemplos)
+                )
+            else:
+                resposta_texto = (
+                    "Estou em modo de contingencia (IA generativa indisponivel no momento). "
+                    "No momento nao encontrei dados suficientes no banco para essa pergunta."
+                )
+        except Exception as e:
+            print(f"Erro no modo de contingencia do chat: {e}")
+            resposta_texto = "Desculpe, o Edson esta temporariamente sem configuracao da IA no backend."
+
+        keywords = ["recomenda", "melhor", "qual jogo", "qual apostar", "dica"]
+        if any(word in request.message.lower() for word in keywords):
+            try:
+                recommendations = rag_service.get_top_live_recommendations(limit=2)
+                if recommendations:
+                    for rec in recommendations:
+                        match_id = rec.get("match_id")
+                        home = rec.get("home_team")
+                        away = rec.get("away_team")
+                        confidence = rec.get("analysis", {}).get("confidenceScore", 0)
+
+                        bet_suggestion = rag_service.get_bet_suggestion(match_id, "balanced")
+                        if bet_suggestion:
+                            selection = bet_suggestion.get("selection", "Analise")
+                            odds = bet_suggestion.get("odds", 1.5)
+
+                            resposta_texto += f"\n\nTop recomendacao: {home} vs {away} (Confianca: {confidence}%)"
+                            resposta_texto += f"\n[[BET:{selection}|{odds}|{match_id}|winner]]"
+            except Exception as e:
+                print(f"Erro ao injetar recomendações no modo de contingencia: {e}")
+
+        return {"response": resposta_texto}
 
     prompt_sistema = (
         "Voce e Edson, assistente de futebol orientado por dados do banco. "
