@@ -7,7 +7,7 @@ import styles from './LiveMatchesCarousel.module.css';
 
 /**
  * LiveMatchesCarousel — Exibe análises ao vivo do backend (compartilhadas entre todos os usuários).
- * Usa /api/analises-salvas (rápido, do DB) com fallback para /api/analises-ao-vivo.
+ * Usa diretamente /api/analises-ao-vivo para garantir dados atuais.
  */
 export default function LiveMatchesCarousel() {
   const [analyses, setAnalyses] = useState([]);
@@ -17,18 +17,19 @@ export default function LiveMatchesCarousel() {
   const fetchAnalyses = useCallback(async () => {
     try {
       setLoading(true);
-      // Tenta primeiro o endpoint rápido (do banco)
-      let response = await fetch(`${BACKEND_URL}/api/analises-salvas`);
+      const response = await fetch(`${BACKEND_URL}/api/analises-ao-vivo`);
       if (!response.ok) {
-        // Fallback para o endpoint que processa ao vivo
-        response = await fetch(`${BACKEND_URL}/api/analises-ao-vivo`);
+        throw new Error(`HTTP ${response.status}`);
       }
       const data = await response.json();
-      if (data?.sucesso && Array.isArray(data.analises) && data.analises.length > 0) {
+      if (data?.sucesso && Array.isArray(data.analises)) {
         setAnalyses(data.analises);
+      } else {
+        setAnalyses([]);
       }
     } catch (error) {
       console.error('[LiveCarousel] Erro ao buscar análises:', error);
+      setAnalyses([]);
     } finally {
       setLoading(false);
     }
@@ -60,7 +61,8 @@ export default function LiveMatchesCarousel() {
     <section className={styles.container}>
       <div className={styles.header}>
         <h2 className={styles.title}>
-          <span className={styles.liveDot} aria-hidden="true" /> Jogos Ao Vivo — Análise IA
+          <span className={styles.liveDot} aria-hidden="true" /> Jogos Ao Vivo —
+          Análise IA
         </h2>
         <span className={styles.powered}>Edson AI</span>
       </div>
@@ -69,13 +71,15 @@ export default function LiveMatchesCarousel() {
         {analyses.map((match) => {
           const analysis = match.analysis || {};
           const win = analysis.winProbability || {};
-          const comments = Array.isArray(analysis.commentary) ? analysis.commentary : [];
+          const comments = Array.isArray(analysis.commentary)
+            ? analysis.commentary
+            : [];
           const confidence = analysis.confidenceScore ?? 0;
           const predicted = analysis.predictedWinner || '';
 
           // Verifica se essa sugestão já está no slip
           const betId = `live-${match.match_id}-${predicted}`;
-          const isSelected = selections.some(s => s.id === betId);
+          const isSelected = selections.some((s) => s.id === betId);
 
           const handleBet = (e) => {
             e.preventDefault();
@@ -84,7 +88,8 @@ export default function LiveMatchesCarousel() {
             // Calcula odds aproximadas com base na probabilidade vencedora
             const probs = [win.home ?? 33, win.draw ?? 33, win.away ?? 34];
             const maxProb = Math.max(...probs);
-            const impliedOdds = maxProb > 0 ? +(100 / maxProb).toFixed(2) : 1.95;
+            const impliedOdds =
+              maxProb > 0 ? +(100 / maxProb).toFixed(2) : 1.95;
 
             toggleSelection({
               id: betId,
@@ -138,9 +143,7 @@ export default function LiveMatchesCarousel() {
               </div>
 
               {/* Comentário IA */}
-              {comments[0] && (
-                <p className={styles.comment}>{comments[0]}</p>
-              )}
+              {comments[0] && <p className={styles.comment}>{comments[0]}</p>}
 
               {/* Rodapé: confiança + CTA */}
               <div className={styles.footer}>
