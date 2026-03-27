@@ -6,7 +6,7 @@ import { BACKEND_URL } from '@/config/backend';
  * ao invés de bater diretamente na API do Google Gemini, permitindo injetar contexto RAG.
  */
 
-const TIMEOUT_MS = 15_000; // Maior tempo pois o backend pode consultar o DB
+const TIMEOUT_MS = 30_000; // 30s para o backend consultar Neon DB + Gemini
 
 const MAX_HISTORY = parseInt(import.meta.env.VITE_EDSON_MAX_HISTORY, 10) || 10;
 

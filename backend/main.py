@@ -1,4 +1,5 @@
 import os
+import json
 import psycopg2
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,22 +21,23 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-lite")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
+# CORS — inclui Vercel e Railway
 default_origins = ",".join([
     "http://localhost:5173",
     "https://esportesdasorte-production.up.railway.app",
+    "https://esportesdasorte.vercel.app",
     "https://esportesdasorte.bet.br",
 ])
 raw_origins = os.getenv("CORS_ORIGINS", default_origins)
-cors_origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()] or ["*"]
+cors_origins = [o.strip() for o in raw_origins.split(",") if o.strip()] or ["*"]
 allow_credentials = "*" not in cors_origins
 
 app = FastAPI(
     title="Assistente de Análise Esportiva (Edson)",
-    description="Backend estruturado com PostgreSQL Neon, BetsAPI e Gemini Lite via RAG.",
-    version="2.0.0"
+    description="Backend RAG com PostgreSQL Neon, BetsAPI e Gemini.",
+    version="3.0.0"
 )
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
@@ -44,17 +46,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Scheduler para manter análises de jogos ao vivo atualizadas em background.
+# Scheduler: análises a cada 5 min
 scheduler = BackgroundScheduler()
 
 def scheduled_live_match_analysis():
     try:
-        print("[Scheduler] Processando análises de jogos ao vivo...")
+        print("[Scheduler] Processando análises ao vivo...")
         analyses = rag_service.analyze_and_cache_live_matches()
-        print(f"[Scheduler] Processadas {len(analyses)} análises")
+        print(f"[Scheduler] {len(analyses)} análises processadas")
     except Exception as e:
-        print(f"[Scheduler] Erro ao processar análises: {e}")
-
+        print(f"[Scheduler] Erro: {e}")
 
 scheduler.add_job(
     scheduled_live_match_analysis,
@@ -67,8 +68,7 @@ scheduler.add_job(
 def on_startup():
     if not scheduler.running:
         scheduler.start()
-        print("Scheduler iniciado para análises de jogos ao vivo")
-
+        print("[App] Scheduler iniciado")
 
 @app.on_event("shutdown")
 def on_shutdown():
@@ -97,8 +97,9 @@ class ChatRequest(BaseModel):
     message: str
     history: List[Dict[str, Any]] = []
 
+
 # ==========================================
-# ROTAS DE USUÁRIOS
+# USUÁRIOS
 # ==========================================
 
 @app.post("/api/login", tags=["Usuários"])
@@ -112,7 +113,6 @@ def validar_login(credenciais: LoginDados):
                      WHERE email_usuario = %s AND senha_usuario = %s"""
             cur.execute(sql, (credenciais.email_usuario, credenciais.senha_usuario))
             usuario = cur.fetchone()
-            
             if usuario:
                 return {"sucesso": True, "mensagem": f"Bem-vindo(a), {usuario['nome_usuario']}!", "usuario": usuario}
             return {"sucesso": False, "erro": "E-mail ou senha incorretos."}
@@ -128,7 +128,7 @@ def criar_usuario(novo_usuario: Usuario):
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
-            sql = """INSERT INTO tb_usuario 
+            sql = """INSERT INTO tb_usuario
                      (nome_usuario, email_usuario, cpf_usuario, dataNac_usuario, endereco_usuario, telefone_usuario, senha_usuario)
                      VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id_usuario"""
             valores = (
@@ -139,7 +139,7 @@ def criar_usuario(novo_usuario: Usuario):
             cur.execute(sql, valores)
             id_gerado = cur.fetchone()['id_usuario']
             conn.commit()
-            return {"sucesso": True, "mensagem": "Usuário cadastrado com sucesso!", "id_gerado": id_gerado}
+            return {"sucesso": True, "mensagem": "Usuário cadastrado!", "id_gerado": id_gerado}
     except psycopg2.IntegrityError:
         return {"sucesso": False, "erro": "E-mail ou CPF já cadastrado."}
     except Exception as erro:
@@ -164,12 +164,12 @@ def listar_usuarios():
 
 
 # ==========================================
-# ROTAS DO ASSISTENTE EDSON E RAG
+# ANÁLISES AO VIVO
 # ==========================================
 
-@app.get("/api/analises-ao-vivo", tags=["Análises Ao Vivo"])
+@app.get("/api/analises-ao-vivo", tags=["Análises"])
 def get_live_analyses():
-    """Retorna lista de jogos ao vivo com análises processadas."""
+    """Processa e retorna análises dos jogos ao vivo (pode ser lento na primeira chamada)."""
     try:
         analises = rag_service.analyze_and_cache_live_matches()
         return {
@@ -179,13 +179,38 @@ def get_live_analyses():
             "timestamp": time.time(),
         }
     except Exception as e:
-        print(f"Erro ao buscar análises ao vivo: {e}")
+        print(f"[API] Erro analises-ao-vivo: {e}")
+        return {"sucesso": False, "quantidade": 0, "analises": [], "erro": str(e)}
+
+
+@app.get("/api/analises-salvas", tags=["Análises"])
+def get_saved_analyses():
+    """Retorna análises já processadas do banco (rápido — sem chamar Gemini)."""
+    try:
+        analises = rag_service.get_all_cached_analyses(max_age_minutes=30)
+        # Enriquece com dados ao vivo em cache se disponíveis
+        live_cache = {m.get("match_id"): m for m in rag_service._cache_live_analyses}
+        enriquecidas = []
+        for a in analises:
+            mid = a["match_id"]
+            live = live_cache.get(mid, {})
+            enriquecidas.append({
+                "match_id": mid,
+                "home_team": live.get("home_team") or a["analysis"].get("homeTeam", "Casa"),
+                "away_team": live.get("away_team") or a["analysis"].get("awayTeam", "Fora"),
+                "live_data": live.get("live_data", {"minute": 0, "home_score": 0, "away_score": 0}),
+                "analysis": a["analysis"],
+                "atualizado_em": a["atualizado_em"],
+            })
         return {
-            "sucesso": False,
-            "quantidade": 0,
-            "analises": [],
-            "erro": str(e),
+            "sucesso": True,
+            "quantidade": len(enriquecidas),
+            "analises": enriquecidas,
+            "timestamp": time.time(),
         }
+    except Exception as e:
+        print(f"[API] Erro analises-salvas: {e}")
+        return {"sucesso": False, "quantidade": 0, "analises": [], "erro": str(e)}
 
 
 @app.get("/api/edson-recommendations", tags=["Edson"])
@@ -193,87 +218,96 @@ def get_edson_recommendations():
     """Retorna TOP 2 jogos ao vivo para Edson recomendar."""
     try:
         recommendations = rag_service.get_top_live_recommendations(limit=2)
-        return {
-            "sucesso": True,
-            "recomendacoes": recommendations,
-            "timestamp": time.time(),
-        }
+        return {"sucesso": True, "recomendacoes": recommendations, "timestamp": time.time()}
     except Exception as e:
-        print(f"Erro ao buscar recomendações: {e}")
         return {"sucesso": False, "recomendacoes": [], "erro": str(e)}
 
-@app.get("/api/analisar/{match_id}", tags=["Edson RAG"])
+
+@app.get("/api/analisar/{match_id}", tags=["Análises"])
 def analisar_partida(match_id: str):
-    """
-    Acionado pela AnalysisPage.jsx. Retorna a previsão robusta baseada em Parquet/BetsAPI.
-    """
+    """Retorna análise de uma partida específica (BetsAPI + Histórico + Gemini)."""
     try:
         resultado = rag_service.analyze_match_with_gemini(match_id)
         if not resultado:
-            raise HTTPException(status_code=500, detail="Erro interno ao gerar análise RAG.")
+            raise HTTPException(status_code=404, detail=f"Partida {match_id} não encontrada nos jogos ao vivo.")
         return resultado
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ==========================================
+# CHAT DO EDSON
+# ==========================================
+
+KEYWORDS_APOSTA = [
+    "recomenda", "melhor", "qual jogo", "qual apostar", "dica", "apostar", "aposta",
+    "sugest", "tip", "bet", "odds", "favorit", "chance", "probabilidade",
+]
+
+def _inject_bet_markers(resposta_texto: str) -> str:
+    """Injeta marcadores [[BET:...]] nas recomendações ao vivo."""
+    try:
+        recommendations = rag_service.get_top_live_recommendations(limit=2)
+        if not recommendations:
+            return resposta_texto
+
+        for rec in recommendations:
+            match_id = rec.get("match_id")
+            home = rec.get("home_team", "Casa")
+            away = rec.get("away_team", "Fora")
+            confidence = (rec.get("analysis", {}) or {}).get("confidenceScore", 0)
+
+            bet = rag_service.get_bet_suggestion(match_id, "balanced")
+            selection = bet.get("selection", "Analise")
+            odds = bet.get("odds", 1.5)
+
+            if selection != "Analise":
+                resposta_texto += (
+                    f"\n\n🔥 **{home} vs {away}** — Confiança: {confidence}%"
+                    f"\n[[BET:{selection}|{odds:.2f}|{match_id}|Resultado Final]]"
+                )
+    except Exception as e:
+        print(f"[Chat] Erro ao injetar BET markers: {e}")
+    return resposta_texto
+
+
 @app.post("/api/chat", tags=["Edson Chat"])
 def edson_chat(request: ChatRequest):
-    """
-    Chat do Edson com contexto RAG vindo do banco Neon.
-    """
+    """Chat do Edson com contexto RAG (banco Neon + análises ao vivo) e sugestões de aposta."""
+
+    has_bet_intent = any(kw in request.message.lower() for kw in KEYWORDS_APOSTA)
+
+    # Modo sem chave Gemini — resposta de contingência
     if not GEMINI_API_KEY:
         try:
-            rag_context = rag_service.build_chat_rag_context(request.message, limit=5)
-            if rag_context:
-                exemplos = []
-                for item in rag_context[:3]:
-                    casa = item.get("time_casa", "?")
-                    fora = item.get("time_fora", "?")
-                    placar = item.get("placar", "?")
-                    exemplos.append(f"{casa} {placar} {fora}")
-
+            rag_ctx = rag_service.build_chat_rag_context(request.message, limit=5)
+            historico = rag_ctx.get("historico", [])
+            if historico:
+                exemplos = [f"{p['time_casa']} {p['placar']} {p['time_fora']}" for p in historico[:3]]
                 resposta_texto = (
-                    "Estou em modo de contingencia (IA generativa indisponivel no momento), "
-                    "mas ainda consigo te ajudar com os dados do banco. "
-                    "Partidas relacionadas encontradas: " + "; ".join(exemplos)
+                    "Estou em modo de contingência (Gemini indisponível), "
+                    "mas encontrei partidas relacionadas: " + "; ".join(exemplos)
                 )
             else:
-                resposta_texto = (
-                    "Estou em modo de contingencia (IA generativa indisponivel no momento). "
-                    "No momento nao encontrei dados suficientes no banco para essa pergunta."
-                )
+                resposta_texto = "Estou em modo de contingência. Não encontrei dados suficientes para essa pergunta."
         except Exception as e:
-            print(f"Erro no modo de contingencia do chat: {e}")
-            resposta_texto = "Desculpe, o Edson esta temporariamente sem configuracao da IA no backend."
+            print(f"[Chat] Erro contingência: {e}")
+            resposta_texto = "Desculpe, o Edson está temporariamente sem configuração de IA."
 
-        keywords = ["recomenda", "melhor", "qual jogo", "qual apostar", "dica"]
-        if any(word in request.message.lower() for word in keywords):
-            try:
-                recommendations = rag_service.get_top_live_recommendations(limit=2)
-                if recommendations:
-                    for rec in recommendations:
-                        match_id = rec.get("match_id")
-                        home = rec.get("home_team")
-                        away = rec.get("away_team")
-                        confidence = rec.get("analysis", {}).get("confidenceScore", 0)
-
-                        bet_suggestion = rag_service.get_bet_suggestion(match_id, "balanced")
-                        if bet_suggestion:
-                            selection = bet_suggestion.get("selection", "Analise")
-                            odds = bet_suggestion.get("odds", 1.5)
-
-                            resposta_texto += f"\n\nTop recomendacao: {home} vs {away} (Confianca: {confidence}%)"
-                            resposta_texto += f"\n[[BET:{selection}|{odds}|{match_id}|winner]]"
-            except Exception as e:
-                print(f"Erro ao injetar recomendações no modo de contingencia: {e}")
+        if has_bet_intent:
+            resposta_texto = _inject_bet_markers(resposta_texto)
 
         return {"response": resposta_texto}
 
+    # Modo normal com Gemini
     prompt_sistema = (
-        "Voce e Edson, assistente de futebol orientado por dados do banco. "
-        "Nunca invente fatos. Se faltar dado no contexto, diga claramente que nao encontrou no banco. "
-        "Quando citar partida, inclua id_partida e placar exato quando disponivel. "
-        "Nao use web. Responda em portugues em no maximo 3 paragrafos."
+        "Você é Edson, assistente de análise esportiva orientado por dados. "
+        "Nunca invente fatos. Use prioritariamente os dados do CONTEXTO abaixo. "
+        "Quando houver jogos ao vivo, mencione-os com dados reais (times, placar, probabilidades). "
+        "Seja direto, objetivo e responda em português em no máximo 3 parágrafos. "
+        "Não use web. Se faltar dado, diga claramente."
     )
 
     model_chat = genai.GenerativeModel(GEMINI_MODEL, system_instruction=prompt_sistema)
@@ -291,17 +325,20 @@ def edson_chat(request: ChatRequest):
     chat = model_chat.start_chat(history=gemini_history)
 
     try:
-        rag_context = rag_service.build_chat_rag_context(request.message, limit=8)
-        rag_context_text = str(rag_context) if rag_context else "[]"
+        rag_ctx = rag_service.build_chat_rag_context(request.message, limit=8)
+        historico_str = json.dumps(rag_ctx.get("historico", []), default=str, ensure_ascii=False)
+        ao_vivo_str = json.dumps(rag_ctx.get("ao_vivo", []), default=str, ensure_ascii=False)
 
         grounded_message = (
-            "[CONTEXTO_RAG_DO_BANCO_NEON]\n"
-            f"{rag_context_text}\n\n"
+            "[CONTEXTO_BANCO_NEON — Histórico de Partidas]\n"
+            f"{historico_str}\n\n"
+            "[JOGOS_AO_VIVO_AGORA — Análise em Tempo Real]\n"
+            f"{ao_vivo_str}\n\n"
             "[REGRAS]\n"
-            "- Use prioritariamente os dados do CONTEXTO_RAG_DO_BANCO_NEON.\n"
-            "- Nao afirme fatos que nao estejam no contexto.\n"
-            "- Se nao houver dado suficiente, informe essa limitacao de forma objetiva.\n\n"
-            "[PERGUNTA_USUARIO]\n"
+            "- Priorize dados do contexto acima.\n"
+            "- Não afirme fatos fora do contexto.\n"
+            "- Para jogos ao vivo, use os dados de winProbability e predictedWinner.\n\n"
+            "[PERGUNTA]\n"
             f"{request.message}"
         )
 
@@ -309,30 +346,13 @@ def edson_chat(request: ChatRequest):
         resposta_texto = (response.text or "").strip()
 
         if not resposta_texto:
-            resposta_texto = "Nao consegui gerar resposta com base nos dados atuais do banco."
+            resposta_texto = "Não consegui gerar resposta com base nos dados atuais."
+
     except Exception as e:
-        print(f"Erro no chat: {e}")
-        resposta_texto = "Desculpe, ocorreu um erro ao consultar o contexto RAG do Edson."
+        print(f"[Chat] Erro Gemini: {e}")
+        resposta_texto = "Ocorreu um erro ao consultar o contexto. Tente novamente."
 
-    keywords = ["recomenda", "melhor", "qual jogo", "qual apostar", "dica"]
-    if any(word in request.message.lower() for word in keywords):
-        try:
-            recommendations = rag_service.get_top_live_recommendations(limit=2)
-            if recommendations:
-                for rec in recommendations:
-                    match_id = rec.get("match_id")
-                    home = rec.get("home_team")
-                    away = rec.get("away_team")
-                    confidence = rec.get("analysis", {}).get("confidenceScore", 0)
-
-                    bet_suggestion = rag_service.get_bet_suggestion(match_id, "balanced")
-                    if bet_suggestion:
-                        selection = bet_suggestion.get("selection", "Analise")
-                        odds = bet_suggestion.get("odds", 1.5)
-
-                        resposta_texto += f"\n\nTop recomendacao: {home} vs {away} (Confianca: {confidence}%)"
-                        resposta_texto += f"\n[[BET:{selection}|{odds}|{match_id}|winner]]"
-        except Exception as e:
-            print(f"Erro ao injetar recomendações: {e}")
+    if has_bet_intent:
+        resposta_texto = _inject_bet_markers(resposta_texto)
 
     return {"response": resposta_texto}

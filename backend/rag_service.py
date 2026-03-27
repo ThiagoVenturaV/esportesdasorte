@@ -8,21 +8,27 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Configurações
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-lite")
 BETS_API_TOKEN = os.getenv("BETS_API_TOKEN", "248558-x464EYT2kttm4b")
 
-# Configurar o Gemini
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    
-# Usar Gemini Lite para custo baixo e latencia menor.
+
 model = genai.GenerativeModel(GEMINI_MODEL)
 
-# Cache p/ evitar flood na BetsAPI
+# Cache em memória para jogos ao vivo (30s)
 _cache_live_matches = None
 _cache_time = 0
+
+# Cache em memória para análises ao vivo (10 min)
+_cache_live_analyses = []
+_cache_timestamp = 0
+
+
+# ====================================================
+# HELPERS
+# ====================================================
 
 def _tokenize_query(query: str):
     stop_words = {
@@ -39,32 +45,152 @@ def _tokenize_query(query: str):
     return tokens[:8]
 
 
+# ====================================================
+# BETSAPI
+# ====================================================
+
 def fetch_live_matches():
     global _cache_live_matches, _cache_time
-    # Cache de 30 segundos
     if _cache_live_matches and (time.time() - _cache_time) < 30:
         return _cache_live_matches
 
     url = f"https://api.b365api.com/v3/events/inplay?sport_id=1&token={BETS_API_TOKEN}"
     try:
-        req = requests.get(url, timeout=10)
+        req = requests.get(url, timeout=12)
         data = req.json()
         if data.get("success") == 1:
             _cache_live_matches = data.get("results", [])
             _cache_time = time.time()
             return _cache_live_matches
     except Exception as e:
-        print(f"Erro BetsAPI: {e}")
+        print(f"[BetsAPI] Erro: {e}")
 
     return []
 
 
-def build_chat_rag_context(user_message: str, limit: int = 8):
-    """
-    Recupera contexto factual do Neon para ancorar o chat do Edson.
-    Retorna lista de partidas relevantes baseada em termos da pergunta.
-    """
+# ====================================================
+# DB — ANÁLISES
+# ====================================================
+
+def save_analysis(match_id: str, analysis_data: dict):
+    """Upsert de análise no banco (insert ou update se já existir)."""
     conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            sql = """
+                INSERT INTO tb_analise (match_id, analise_json, atualizado_em)
+                VALUES (%s, %s, NOW())
+                ON CONFLICT (match_id)
+                DO UPDATE SET analise_json = EXCLUDED.analise_json,
+                              atualizado_em = NOW()
+            """
+            cur.execute(sql, (match_id, json.dumps(analysis_data)))
+        conn.commit()
+    except Exception as e:
+        print(f"[DB] Erro ao salvar análise: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+
+def get_saved_analysis(match_id: str, max_age_minutes: int = 5):
+    """Retorna análise salva no DB se tiver menos de max_age_minutes."""
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            sql = """
+                SELECT analise_json
+                FROM tb_analise
+                WHERE match_id = %s
+                  AND atualizado_em >= NOW() - INTERVAL '%s minutes'
+                ORDER BY atualizado_em DESC
+                LIMIT 1
+            """
+            cur.execute(sql, (match_id, max_age_minutes))
+            result = cur.fetchone()
+            if result:
+                raw = result["analise_json"]
+                if isinstance(raw, dict):
+                    return raw
+                return json.loads(raw)
+    except Exception as e:
+        print(f"[DB] Erro ao buscar análise: {e}")
+    finally:
+        if conn:
+            conn.close()
+    return None
+
+
+def get_all_cached_analyses(max_age_minutes: int = 15):
+    """Retorna todas as análises recentes do banco (endpoint público para todos os usuários)."""
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            sql = """
+                SELECT match_id, analise_json, atualizado_em
+                FROM tb_analise
+                WHERE atualizado_em >= NOW() - INTERVAL '%s minutes'
+                ORDER BY atualizado_em DESC
+                LIMIT 20
+            """
+            cur.execute(sql, (max_age_minutes,))
+            rows = cur.fetchall() or []
+            results = []
+            for row in rows:
+                raw = row["analise_json"]
+                analise = raw if isinstance(raw, dict) else json.loads(raw)
+                results.append({
+                    "match_id": row["match_id"],
+                    "analysis": analise,
+                    "atualizado_em": str(row["atualizado_em"]),
+                })
+            return results
+    except Exception as e:
+        print(f"[DB] Erro ao buscar análises salvas: {e}")
+        return []
+    finally:
+        if conn:
+            conn.close()
+
+
+# ====================================================
+# HISTÓRICO
+# ====================================================
+
+def get_historical_context(home_team: str, away_team: str):
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            sql = """
+                SELECT time_casa, time_fora, gols_casa, gols_fora, competicao, temporada
+                FROM tb_partida_historico
+                WHERE time_casa ILIKE %s OR time_fora ILIKE %s
+                   OR time_casa ILIKE %s OR time_fora ILIKE %s
+                LIMIT 10
+            """
+            cur.execute(sql, (f"%{home_team}%", f"%{home_team}%", f"%{away_team}%", f"%{away_team}%"))
+            return cur.fetchall() or []
+    except Exception as e:
+        print(f"[DB] Erro ao buscar histórico: {e}")
+        return []
+    finally:
+        if conn:
+            conn.close()
+
+
+# ====================================================
+# RAG CONTEXT PARA CHAT
+# ====================================================
+
+def build_chat_rag_context(user_message: str, limit: int = 8):
+    """Recupera contexto do banco + injeta análises ao vivo recentes."""
+    conn = None
+    historico_items = []
+
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
@@ -88,20 +214,16 @@ def build_chat_rag_context(user_message: str, limit: int = 8):
                 values.append(limit)
                 cur.execute(sql, values)
             else:
-                cur.execute(
-                    """
+                cur.execute("""
                     SELECT id_partida, time_casa, time_fora, gols_casa, gols_fora, competicao, temporada
                     FROM tb_partida_historico
                     ORDER BY id_partida DESC
                     LIMIT %s
-                    """,
-                    (limit,),
-                )
+                """, (limit,))
 
             rows = cur.fetchall() or []
-            context_items = []
             for row in rows:
-                context_items.append({
+                historico_items.append({
                     "id_partida": str(row.get("id_partida", "")),
                     "time_casa": row.get("time_casa", ""),
                     "time_fora": row.get("time_fora", ""),
@@ -109,144 +231,84 @@ def build_chat_rag_context(user_message: str, limit: int = 8):
                     "competicao": row.get("competicao", ""),
                     "temporada": row.get("temporada", ""),
                 })
-
-            return context_items
     except Exception as e:
-        print(f"Erro ao montar contexto RAG do chat: {e}")
-        return []
+        print(f"[RAG] Erro ao montar contexto histórico: {e}")
     finally:
         if conn:
             conn.close()
 
-def get_historical_context(home_team, away_team):
-    """
-    Busca o histórico de confronto ou estatísticas no Neon DB.
-    """
-    conn = None
-    try:
-        conn = get_db_connection()
-        with conn.cursor() as cur:
-            # Buscar jogos onde qualquer um dos dois times jogou (para montar média de xG ou desempenho passado)
-            sql = """
-                SELECT time_casa, time_fora, gols_casa, gols_fora, competicao, temporada 
-                FROM tb_partida_historico 
-                WHERE time_casa ILIKE %s OR time_fora ILIKE %s OR time_casa ILIKE %s OR time_fora ILIKE %s
-                LIMIT 10
-            """
-            cur.execute(sql, (f"%{home_team}%", f"%{home_team}%", f"%{away_team}%", f"%{away_team}%"))
-            historico = cur.fetchall()
-            return historico
-    except Exception as e:
-        print(f"Erro ao buscar histórico: {e}")
-        return []
-    finally:
-        if conn:
-            conn.close()
+    # Injeta também as análises ao vivo em cache
+    live_ctx = []
+    for item in _cache_live_analyses[:5]:
+        analysis = item.get("analysis", {}) or {}
+        live_ctx.append({
+            "match_id": item.get("match_id"),
+            "em_andamento": True,
+            "home_team": item.get("home_team"),
+            "away_team": item.get("away_team"),
+            "placar": f"{item.get('live_data', {}).get('home_score', 0)}-{item.get('live_data', {}).get('away_score', 0)}",
+            "minuto": item.get("live_data", {}).get("minute", 0),
+            "winProbability": analysis.get("winProbability", {}),
+            "predictedWinner": analysis.get("predictedWinner", ""),
+            "confidenceScore": analysis.get("confidenceScore", 0),
+        })
 
-def save_analysis(match_id, analysis_data):
-    """
-    Salva a resposta do Gemini no banco de dados Neon para consumo rápido e histórico.
-    """
-    conn = None
-    try:
-        conn = get_db_connection()
-        with conn.cursor() as cur:
-            sql = "INSERT INTO tb_analise (match_id, analise_json) VALUES (%s, %s)"
-            cur.execute(sql, (match_id, json.dumps(analysis_data)))
-            conn.commit()
-    except Exception as e:
-        print(f"Erro ao salvar análise no banco: {e}")
-    finally:
-        if conn:
-            conn.close()
+    return {"historico": historico_items, "ao_vivo": live_ctx}
 
-def get_saved_analysis(match_id):
-    """
-    Verifica se a partida já tem análise gerada nos últimos 5 minutos no DB.
-    """
-    conn = None
-    try:
-        conn = get_db_connection()
-        with conn.cursor() as cur:
-            sql = """
-                SELECT analise_json 
-                FROM tb_analise 
-                WHERE match_id = %s 
-                ORDER BY criado_em DESC 
-                LIMIT 1
-            """
-            cur.execute(sql, (match_id,))
-            result = cur.fetchone()
-            if result:
-                # Retorna o JSONB parseado
-                return result['analise_json']
-    except Exception as e:
-        print(f"Erro ao buscar análise salva: {e}")
-    finally:
-        if conn:
-            conn.close()
-    return None
+
+# ====================================================
+# ANÁLISE GEMINI POR PARTIDA
+# ====================================================
 
 def analyze_match_with_gemini(match_id: str):
-    """
-    Gera a análise de uma partida combinando dados ao vivo + histórico do banco + Gemini.
-    Retorna no formato exato que a AnalysisPage.jsx espera.
-    """
-    # 1. Tenta pegar do banco primeiro para ser rápido (se não precisar reprocessar agora)
-    # Por exemplo, para mock ou testes
-    # (Em prod, pode-se forçar regeneração condicionalmente)
-    # saved = get_saved_analysis(match_id)
-    # if saved:
-    #     return saved
-        
-    # 2. Resgata partida ao vivo
+    """Gera análise combinando BetsAPI + histórico + Gemini. Usa cache DB com TTL de 5 min."""
+
+    # 1. Tenta pegar do banco primeiro (TTL 5 min)
+    saved = get_saved_analysis(match_id, max_age_minutes=5)
+    if saved:
+        print(f"[RAG] Cache DB hit para match {match_id}")
+        return saved
+
+    # 2. Busca partida ao vivo na BetsAPI
     live_matches = fetch_live_matches()
-    target_match = None
-    
-    # Procura na API se houver (se o frontend mandou um ID real). 
-    for m in live_matches:
-        if str(m.get("id")) == str(match_id):
-            target_match = m
-            break
-            
+    target_match = next((m for m in live_matches if str(m.get("id")) == str(match_id)), None)
+
     if not target_match:
-        print(f"[RAG] Partida {match_id} não encontrada nos jogos ao vivo da BetsAPI")
+        print(f"[RAG] Partida {match_id} não encontrada nos jogos ao vivo")
         return None
 
     home_name = target_match.get("home", {}).get("name", "")
     away_name = target_match.get("away", {}).get("name", "")
-    
-    # 3. Busca histórico no DB
+
+    # 3. Histórico no banco
     historico = get_historical_context(home_name, away_name)
     historico_str = json.dumps(historico, default=str)
-    
-    # Formata prompt forte (System Instruction style)
-    prompt = f"""
-Você é o Edson, um assistente virtual ultra-avançado em análise de dados esportivos.
-Sua missão é gerar um relatório estatístico e preditivo baseado em dados Reais (BetsAPI) e Históricos (StatsBomb/Banco).
 
-Dados ao vivo da partida (BetsAPI):
+    prompt = f"""
+Você é o Edson, assistente ultra-avançado em análise esportiva.
+Sua missão: relatório estatístico e preditivo baseado em dados Reais (BetsAPI) e Históricos (Banco).
+
+Dados ao vivo (BetsAPI):
 {json.dumps(target_match)}
 
-Dados Históricos (Banco Neon PostgreSQL / Statsbomb):
-{historico_str if historico else "Sem amplo histórico. Baseie-se nas odds e no momento."}
+Histórico (Banco Neon):
+{historico_str if historico else "Sem histórico disponível. Use as odds e momento atual."}
 
-INSTRUÇÕES DE PREENCHIMENTO E RESPONSABILIDADE ESPECÍFICAS:
-Você DEVE obrigatoriamente retornar APENAS um objeto JSON. Sem formatação Markdown (remova ```json e ```). Absolutamente nenhum texto antes ou depois.
-
-O JSON deve respeitar ESTRITAMENTE esta estrutura e chaves para o componente React renderizar corretamente:
+RETORNE APENAS JSON VÁLIDO sem markdown, sem texto antes ou depois:
 {{
   "matchId": "{match_id}",
-  "winProbability": {{ "home": [Inteiro 0-100], "draw": [Inteiro 0-100], "away": [Inteiro 0-100] }},
-  "goalProbabilityNextMinute": [Inteiro 0-100],
-  "cardRiskHome": [Inteiro 0-100],
-  "cardRiskAway": [Inteiro 0-100],
-  "penaltyRisk": [Inteiro 0-100],
-  "momentumHome": [Array de 15 números inteiros entre 0-100 simulando posse/pressão a cada 5 min],
-  "momentumAway": [Array de 15 números inteiros entre 0-100 simulando posse/pressão a cada 5 min],
-  "commentary": [Array com exatas duas strings de comentários técnicos táticos sobre o jogo],
-  "predictedWinner": "Nome do time com maior chance, ou 'Empate'",
-  "confidenceScore": [Inteiro 0-100]
+  "homeTeam": "{home_name}",
+  "awayTeam": "{away_name}",
+  "winProbability": {{ "home": [0-100], "draw": [0-100], "away": [0-100] }},
+  "goalProbabilityNextMinute": [0-100],
+  "cardRiskHome": [0-100],
+  "cardRiskAway": [0-100],
+  "penaltyRisk": [0-100],
+  "momentumHome": [15 inteiros 0-100],
+  "momentumAway": [15 inteiros 0-100],
+  "commentary": ["comentário técnico 1", "comentário técnico 2"],
+  "predictedWinner": "Nome do time ou Empate",
+  "confidenceScore": [0-100]
 }}
 """
 
@@ -255,40 +317,33 @@ O JSON deve respeitar ESTRITAMENTE esta estrutura e chaves para o componente Rea
             prompt,
             generation_config=genai.types.GenerationConfig(
                 temperature=0.3,
-                response_mime_type="application/json", # Força Output Estruturado JSON do Gemini
+                response_mime_type="application/json",
             )
         )
-        
-        texto_limpo = response.text.replace('```json', '').replace('```', '').strip()
+        texto_limpo = response.text.replace("```json", "").replace("```", "").strip()
         analysis_data = json.loads(texto_limpo)
-        
-        # Salva o resultado no Postgres
+
+        # Salva no DB (upsert)
         save_analysis(match_id, analysis_data)
-        
         return analysis_data
-        
+
     except Exception as e:
-        print(f"Erro na geração Gemini/RAG: {e}")
+        print(f"[RAG] Erro Gemini: {e}")
+
+        # Fallback baseado no estado real da partida
         score = str(target_match.get("ss", "0-0"))
         score_parts = score.split("-") if "-" in score else ["0", "0"]
-        try:
-            home_score = int(score_parts[0].strip())
-        except Exception:
-            home_score = 0
-        try:
-            away_score = int(score_parts[1].strip())
-        except Exception:
-            away_score = 0
+        home_score = int(score_parts[0].strip()) if score_parts[0].strip().isdigit() else 0
+        away_score = int(score_parts[1].strip()) if len(score_parts) > 1 and score_parts[1].strip().isdigit() else 0
 
         minute_raw = target_match.get("time", target_match.get("minute", 0))
         try:
             minute = int(str(minute_raw))
-            if minute > 200:  # BetsAPI às vezes retorna timestamp; normaliza para minuto de jogo
+            if minute > 200:
                 minute = 90
         except Exception:
             minute = 0
 
-        # Fallback sem mock: usa apenas estado real da partida.
         if home_score > away_score:
             win_prob = {"home": 62, "draw": 24, "away": 14}
             predicted = home_name
@@ -299,37 +354,35 @@ O JSON deve respeitar ESTRITAMENTE esta estrutura e chaves para o componente Rea
             win_prob = {"home": 36, "draw": 40, "away": 24}
             predicted = "Empate"
 
-        goal_next = 22 if minute < 70 else 12
-
         analysis_data = {
             "matchId": match_id,
+            "homeTeam": home_name,
+            "awayTeam": away_name,
             "winProbability": win_prob,
-            "goalProbabilityNextMinute": goal_next,
+            "goalProbabilityNextMinute": 22 if minute < 70 else 12,
             "cardRiskHome": 28,
             "cardRiskAway": 28,
             "penaltyRisk": 8,
             "momentumHome": [50] * 15,
             "momentumAway": [50] * 15,
             "commentary": [
-                f"Dados ao vivo: {home_name} {home_score} x {away_score} {away_name} aos {minute} minutos.",
-                "Análise gerada diretamente do estado atual da partida (sem simulação de times mock)."
+                f"{home_name} {home_score} x {away_score} {away_name} aos {minute} minutos.",
+                "Análise gerada com base no estado atual da partida."
             ],
             "predictedWinner": predicted,
             "confidenceScore": 52,
         }
 
+        save_analysis(match_id, analysis_data)
         return analysis_data
 
 
-# Cache dedicado para análises ao vivo compartilhadas entre usuários.
-_cache_live_analyses = []
-_cache_timestamp = 0
+# ====================================================
+# ANÁLISES AO VIVO EM LOTE
+# ====================================================
 
-
-def analyze_and_cache_live_matches(limit=10):
-    """
-    Processa os jogos ao vivo, gera análise com Gemini e mantém cache por 10 minutos.
-    """
+def analyze_and_cache_live_matches(limit: int = 10):
+    """Processa jogos ao vivo, gera análise Gemini e mantém cache por 10 min."""
     global _cache_live_analyses, _cache_timestamp
 
     if _cache_live_analyses and (time.time() - _cache_timestamp) < 600:
@@ -338,7 +391,7 @@ def analyze_and_cache_live_matches(limit=10):
     try:
         live_matches = fetch_live_matches()
         if not live_matches:
-            print("[Live Analysis] Nenhum jogo ao vivo disponível")
+            print("[Live Analysis] Nenhum jogo ao vivo")
             return _cache_live_analyses
 
         top_matches = live_matches[:limit]
@@ -365,28 +418,31 @@ def analyze_and_cache_live_matches(limit=10):
                     "away_team": away_team,
                     "live_data": {
                         "minute": match.get("time", match.get("minute", 0)),
-                        "home_score": score_parts[0].strip() if len(score_parts) > 0 else "0",
+                        "home_score": score_parts[0].strip() if score_parts else "0",
                         "away_score": score_parts[1].strip() if len(score_parts) > 1 else "0",
                     },
                     "analysis": analysis,
                     "timestamp": time.time(),
                 })
             except Exception as e:
-                print(f"[Live Analysis] Erro processando partida: {e}")
+                print(f"[Live Analysis] Erro na partida: {e}")
 
         _cache_live_analyses = analyses
         _cache_timestamp = time.time()
         print(f"[Live Analysis] Processadas {len(analyses)} análises")
         return _cache_live_analyses
+
     except Exception as e:
         print(f"[Live Analysis] Erro geral: {e}")
         return _cache_live_analyses
 
 
+# ====================================================
+# APOSTAS / RECOMENDAÇÕES
+# ====================================================
+
 def get_bet_suggestion(match_id: str, style: str = "balanced"):
-    """
-    Gera sugestão de aposta a partir das probabilidades da análise.
-    """
+    """Gera sugestão de aposta a partir das probabilidades."""
     try:
         match_data = next((m for m in _cache_live_analyses if m.get("match_id") == str(match_id)), None)
         if not match_data:
@@ -397,33 +453,29 @@ def get_bet_suggestion(match_id: str, style: str = "balanced"):
         home_prob = float(win_prob.get("home", 33))
         draw_prob = float(win_prob.get("draw", 33))
         away_prob = float(win_prob.get("away", 34))
+        home_name = match_data.get("home_team", "Casa")
+        away_name = match_data.get("away_team", "Fora")
 
-        style_threshold = {
-            "conservative": 65,
-            "balanced": 50,
-            "aggressive": 35,
-        }.get(style, 50)
+        threshold = {"conservative": 65, "balanced": 50, "aggressive": 35}.get(style, 50)
 
         options = [
-            ("Home", home_prob, 1.95),
-            ("Draw", draw_prob, 3.20),
-            ("Away", away_prob, 1.95),
+            (home_name, home_prob, 1.95),
+            ("Empate", draw_prob, 3.20),
+            (away_name, away_prob, 1.95),
         ]
         best = max(options, key=lambda x: x[1])
 
-        if best[1] >= style_threshold:
-            return {"selection": best[0], "odds": best[2]}
+        if best[1] >= threshold:
+            return {"selection": best[0], "odds": best[2], "confidence": round(best[1])}
 
-        return {"selection": "Analise", "odds": 1.5}
+        return {"selection": "Analise", "odds": 1.5, "confidence": 0}
     except Exception as e:
-        print(f"[Bet Suggestion] Erro: {e}")
+        print(f"[BetSuggestion] Erro: {e}")
         return {"selection": "Analise", "odds": 1.5}
 
 
 def get_top_live_recommendations(limit: int = 2):
-    """
-    Retorna TOP jogos ao vivo ordenados por confidence score.
-    """
+    """Retorna TOP jogos ao vivo por confidence score."""
     try:
         analyses = analyze_and_cache_live_matches(limit=10)
         if not analyses:
@@ -436,5 +488,5 @@ def get_top_live_recommendations(limit: int = 2):
         )
         return ordered[:limit]
     except Exception as e:
-        print(f"[Top Recommendations] Erro: {e}")
+        print(f"[TopRec] Erro: {e}")
         return []

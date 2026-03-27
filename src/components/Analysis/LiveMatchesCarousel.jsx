@@ -1,51 +1,57 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { BACKEND_URL } from '@/config/backend';
+import { useBetSlip } from '@/components/BetSlip/BetSlipContext';
+import { ROUTES } from '@/config/routes';
 import styles from './LiveMatchesCarousel.module.css';
 
+/**
+ * LiveMatchesCarousel — Exibe análises ao vivo do backend (compartilhadas entre todos os usuários).
+ * Usa /api/analises-salvas (rápido, do DB) com fallback para /api/analises-ao-vivo.
+ */
 export default function LiveMatchesCarousel() {
   const [analyses, setAnalyses] = useState([]);
   const [loading, setLoading] = useState(false);
+  const { toggleSelection, selections } = useBetSlip();
+
+  const fetchAnalyses = useCallback(async () => {
+    try {
+      setLoading(true);
+      // Tenta primeiro o endpoint rápido (do banco)
+      let response = await fetch(`${BACKEND_URL}/api/analises-salvas`);
+      if (!response.ok) {
+        // Fallback para o endpoint que processa ao vivo
+        response = await fetch(`${BACKEND_URL}/api/analises-ao-vivo`);
+      }
+      const data = await response.json();
+      if (data?.sucesso && Array.isArray(data.analises) && data.analises.length > 0) {
+        setAnalyses(data.analises);
+      }
+    } catch (error) {
+      console.error('[LiveCarousel] Erro ao buscar análises:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let mounted = true;
-
-    const fetchLiveAnalyses = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`${BACKEND_URL}/api/analises-ao-vivo`);
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const data = await response.json();
-        if (mounted && data?.sucesso && Array.isArray(data.analises)) {
-          setAnalyses(data.analises);
-        }
-      } catch (error) {
-        console.error('Erro ao buscar analises ao vivo:', error);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    fetchLiveAnalyses();
-    const intervalId = setInterval(fetchLiveAnalyses, 120000);
-
-    return () => {
-      mounted = false;
-      clearInterval(intervalId);
-    };
-  }, []);
+    fetchAnalyses();
+    const interval = setInterval(fetchAnalyses, 120_000); // Atualiza a cada 2 min
+    return () => clearInterval(interval);
+  }, [fetchAnalyses]);
 
   if (loading && analyses.length === 0) {
     return (
-      <section className={styles.stateBox}>Carregando jogos ao vivo...</section>
+      <section className={styles.stateBox}>
+        <span className={styles.spinner} /> Carregando jogos ao vivo...
+      </section>
     );
   }
 
-  if (analyses.length === 0) {
+  if (!loading && analyses.length === 0) {
     return (
       <section className={styles.stateBox}>
-        Nenhum jogo ao vivo disponivel.
+        Nenhum jogo ao vivo disponível no momento.
       </section>
     );
   }
@@ -53,45 +59,104 @@ export default function LiveMatchesCarousel() {
   return (
     <section className={styles.container}>
       <div className={styles.header}>
-        <h2 className={styles.title}>Jogos Ao Vivo</h2>
+        <h2 className={styles.title}>
+          <span className={styles.liveDot} aria-hidden="true" /> Jogos Ao Vivo — Análise IA
+        </h2>
+        <span className={styles.powered}>Edson AI</span>
       </div>
+
       <div className={styles.carousel}>
         {analyses.map((match) => {
           const analysis = match.analysis || {};
           const win = analysis.winProbability || {};
-          const comments = Array.isArray(analysis.commentary)
-            ? analysis.commentary
-            : [];
+          const comments = Array.isArray(analysis.commentary) ? analysis.commentary : [];
+          const confidence = analysis.confidenceScore ?? 0;
+          const predicted = analysis.predictedWinner || '';
+
+          // Verifica se essa sugestão já está no slip
+          const betId = `live-${match.match_id}-${predicted}`;
+          const isSelected = selections.some(s => s.id === betId);
+
+          const handleBet = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Calcula odds aproximadas com base na probabilidade vencedora
+            const probs = [win.home ?? 33, win.draw ?? 33, win.away ?? 34];
+            const maxProb = Math.max(...probs);
+            const impliedOdds = maxProb > 0 ? +(100 / maxProb).toFixed(2) : 1.95;
+
+            toggleSelection({
+              id: betId,
+              matchName: `${match.home_team} vs ${match.away_team}`,
+              market: 'Resultado Final',
+              pick: predicted,
+              odd: impliedOdds,
+            });
+          };
 
           return (
-            <article key={match.match_id} className={styles.card}>
+            <Link
+              key={match.match_id}
+              to={ROUTES.ANALYSIS(match.match_id)}
+              className={styles.card}
+              aria-label={`Ver análise de ${match.home_team} vs ${match.away_team}`}
+            >
+              {/* Score Header */}
               <div className={styles.teams}>
-                <span>{match.home_team}</span>
-                <strong>
-                  {match.live_data?.home_score ?? 0}-
+                <span className={styles.teamName}>{match.home_team}</span>
+                <strong className={styles.score}>
+                  {match.live_data?.home_score ?? 0}
+                  <span className={styles.scoreSep}>-</span>
                   {match.live_data?.away_score ?? 0}
                 </strong>
-                <span>{match.away_team}</span>
+                <span className={styles.teamName}>{match.away_team}</span>
               </div>
 
               <div className={styles.minute}>
-                Minuto: {match.live_data?.minute ?? 0}
+                ⏱ {match.live_data?.minute ?? 0}'
               </div>
 
+              {/* Probabilidades */}
               <div className={styles.probabilities}>
-                <span>Casa: {win.home ?? 0}%</span>
-                <span>Empate: {win.draw ?? 0}%</span>
-                <span>Fora: {win.away ?? 0}%</span>
+                <div className={styles.prob}>
+                  <span className={styles.probLabel}>Casa</span>
+                  <span className={styles.probValue}>{win.home ?? 0}%</span>
+                </div>
+                <div className={styles.prob}>
+                  <span className={styles.probLabel}>Empate</span>
+                  <span className={styles.probValue}>{win.draw ?? 0}%</span>
+                </div>
+                <div className={styles.prob}>
+                  <span className={styles.probLabel}>Fora</span>
+                  <span className={styles.probValue}>{win.away ?? 0}%</span>
+                </div>
               </div>
 
-              <p className={styles.comment}>
-                {comments[0] || 'Analise em atualizacao para esta partida.'}
-              </p>
+              {/* Comentário IA */}
+              {comments[0] && (
+                <p className={styles.comment}>{comments[0]}</p>
+              )}
 
-              <div className={styles.confidence}>
-                Confianca: {analysis.confidenceScore ?? 0}%
+              {/* Rodapé: confiança + CTA */}
+              <div className={styles.footer}>
+                <span className={styles.confidence}>
+                  🎯 Confiança: <strong>{confidence}%</strong>
+                </span>
+
+                {predicted && predicted !== 'Empate' ? (
+                  <button
+                    className={`${styles.betBtn} ${isSelected ? styles.betBtnActive : ''}`}
+                    onClick={handleBet}
+                    aria-label={`Apostar em ${predicted}`}
+                  >
+                    {isSelected ? '✓ ADICIONADO' : `APOSTAR — ${predicted}`}
+                  </button>
+                ) : (
+                  <span className={styles.viewAnalysis}>Ver Análise →</span>
+                )}
               </div>
-            </article>
+            </Link>
           );
         })}
       </div>

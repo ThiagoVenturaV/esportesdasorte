@@ -105,8 +105,98 @@
 }
 
 .edson-widget--open {
-  flex-direction: column-reverse;
+  flex-direction: column;
   gap: 12px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PANEL — INPUT BAR (fundo do chat)
+   ═══════════════════════════════════════════════════════════════════ */
+
+.edson-panel__input-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--edson-border);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.edson-panel__input {
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--edson-border);
+  border-radius: 9999px;
+  padding: 8px 14px;
+  color: var(--edson-text);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--edson-transition);
+}
+
+.edson-panel__input:focus {
+  border-color: var(--edson-border-focus);
+}
+
+.edson-panel__input::placeholder {
+  color: var(--edson-text-dim);
+}
+
+.edson-panel__input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.edson-panel__send {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--edson-radius-full);
+  background: linear-gradient(135deg, var(--edson-primary) 0%, var(--edson-accent) 100%);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity var(--edson-transition), transform 150ms ease;
+}
+
+.edson-panel__send:hover:not(:disabled) { transform: scale(1.08); }
+.edson-panel__send:active:not(:disabled) { transform: scale(0.95); }
+.edson-panel__send:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ─── Quick prompts ──────────── */
+.edson-panel__quick-prompts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.edson-panel__quick-btn {
+  background: rgba(56, 230, 125, 0.07);
+  border: 1px solid rgba(56, 230, 125, 0.2);
+  border-radius: 10px;
+  padding: 8px 12px;
+  color: var(--edson-text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--edson-transition);
+}
+
+.edson-panel__quick-btn:hover:not(:disabled) {
+  background: rgba(56, 230, 125, 0.14);
+  border-color: var(--edson-accent);
+  color: var(--edson-text);
+}
+
+.edson-panel__quick-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
