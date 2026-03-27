@@ -165,9 +165,12 @@ def edson_chat(request: ChatRequest):
 
     gemini_history = []
     for m in request.history:
+        parts = m.get("parts", [])
+        if not parts:
+            parts = [{"text": ""}]
         gemini_history.append({
             "role": m.get("role", "user"),
-            "parts": [p.get("text", "") for p in m.get("parts", [{"text": ""}])],
+            "parts": [{"text": p.get("text", "") if isinstance(p, dict) else str(p)} for p in parts],
         })
 
     chat = model_chat.start_chat(history=gemini_history)
