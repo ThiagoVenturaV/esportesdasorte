@@ -1,0 +1,47 @@
+import { BACKEND_URL } from '@/config/backend';
+
+async function parseJsonSafe(response) {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function loginUser({ email_usuario, senha_usuario }) {
+  const response = await fetch(`${BACKEND_URL}/api/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email_usuario, senha_usuario }),
+  });
+
+  const data = await parseJsonSafe(response);
+  if (!response.ok) {
+    throw new Error(data?.erro || 'Falha ao autenticar usuário.');
+  }
+
+  if (!data?.sucesso) {
+    throw new Error(data?.erro || 'Credenciais inválidas.');
+  }
+
+  return data;
+}
+
+export async function registerUser(payload) {
+  const response = await fetch(`${BACKEND_URL}/api/usuarios`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await parseJsonSafe(response);
+  if (!response.ok) {
+    throw new Error(data?.erro || 'Falha ao cadastrar usuário.');
+  }
+
+  if (!data?.sucesso) {
+    throw new Error(data?.erro || 'Não foi possível concluir o cadastro.');
+  }
+
+  return data;
+}

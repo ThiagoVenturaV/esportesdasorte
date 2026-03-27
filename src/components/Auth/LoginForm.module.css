@@ -1,0 +1,175 @@
+.container {
+  background: radial-gradient(circle at 100% 100%, #1a3c7a 0%, #0d1a33 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 20px 12px;
+  color: white;
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.logoWrap {
+  margin-bottom: 15px;
+  display: flex;
+  justify-content: center;
+}
+
+.logo {
+  height: 48px;
+  width: auto;
+}
+
+.title {
+  color: #38e67d;
+  font-size: 2.5rem;
+  font-weight: 900;
+  letter-spacing: 2px;
+}
+
+.form {
+  background: rgba(26, 26, 46, 0.4);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(56, 230, 125, 0.1);
+  border-radius: 16px;
+  padding: 30px;
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  color: #38e67d;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.inputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input {
+  width: 100%;
+  background: transparent;
+  border: 1px solid #38e67d;
+  border-radius: 8px;
+  padding: 12px 40px 12px 15px;
+  color: white;
+  font-family: inherit;
+}
+
+.input::placeholder {
+  color: rgba(160, 168, 192, 0.5);
+}
+
+.inputIcon {
+  position: absolute;
+  right: 15px;
+  color: #38e67d;
+  opacity: 0.7;
+}
+
+.submitBtn {
+  background: #38e67d;
+  color: #0d1a33;
+  padding: 15px;
+  border-radius: 12px;
+  border: none;
+  font-weight: 800;
+  font-size: 1rem;
+  margin-top: 10px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.submitBtn:hover {
+  opacity: 0.9;
+}
+
+.submitBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.feedback {
+  margin: 0;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.feedbackError {
+  color: #ff8e8e;
+}
+
+.feedbackSuccess {
+  color: #8dffb7;
+}
+
+.links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.link {
+  color: #38e67d;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.footer {
+  margin-top: 12px;
+  text-align: center;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.statusDot {
+  width: 10px;
+  height: 10px;
+  background: #38e67d;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #38e67d;
+}
+
+.version {
+  font-size: 0.7rem;
+  color: rgba(160, 168, 192, 0.6);
+  margin-top: 5px;
+}
+
+.sparkle {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  color: rgba(160, 168, 192, 0.8);
+  font-size: 1.5rem;
+}

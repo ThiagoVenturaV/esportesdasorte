@@ -1,0 +1,24 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/edson/:path*",
+      "destination": "/api/edson/:path*"
+    },
+    {
+      "source": "/api-v2/:path*",
+      "destination": "https://esportesdasorte.bet.br/api-v2/:path*"
+    },
+    {
+      "source": "/api-generic/:path*",
+      "destination": "https://esportesdasorte.bet.br/api-generic/:path*"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://esportesdasorte.bet.br/api/:path*"
+    },
+    {
+      "source": "/bragi/:path*",
+      "destination": "https://bragi.sportingtech.com/:path*"
+    }
+  ]
+}
