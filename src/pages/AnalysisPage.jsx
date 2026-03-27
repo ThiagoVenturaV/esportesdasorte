@@ -134,9 +134,11 @@ export default function AnalysisPage() {
             </span>
           </div>
 
-          <Link to={ROUTES.BETTING(match.id)} className={styles.betCTA}>
-            APOSTAR AGORA
-          </Link>
+          <div className={styles.betCTAWrapper}>
+            <Link to={ROUTES.BETTING(match.id)} className={styles.betCTA}>
+              APOSTAR AGORA
+            </Link>
+          </div>
         </div>
       </motion.div>
 
