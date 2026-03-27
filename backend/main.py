@@ -6,6 +6,9 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from dotenv import load_dotenv
 import google.generativeai as genai
+import time
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 
 from db_neon import get_db_connection
 import rag_service
@@ -39,6 +42,37 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Scheduler para manter análises de jogos ao vivo atualizadas em background.
+scheduler = BackgroundScheduler()
+
+def scheduled_live_match_analysis():
+    try:
+        print("[Scheduler] Processando análises de jogos ao vivo...")
+        analyses = rag_service.analyze_and_cache_live_matches()
+        print(f"[Scheduler] Processadas {len(analyses)} análises")
+    except Exception as e:
+        print(f"[Scheduler] Erro ao processar análises: {e}")
+
+
+scheduler.add_job(
+    scheduled_live_match_analysis,
+    trigger=IntervalTrigger(minutes=5),
+    id="live_match_analysis",
+    replace_existing=True,
+)
+
+@app.on_event("startup")
+def on_startup():
+    if not scheduler.running:
+        scheduler.start()
+        print("Scheduler iniciado para análises de jogos ao vivo")
+
+
+@app.on_event("shutdown")
+def on_shutdown():
+    if scheduler.running:
+        scheduler.shutdown(wait=False)
 
 
 # ==========================================
@@ -132,6 +166,41 @@ def listar_usuarios():
 # ROTAS DO ASSISTENTE EDSON E RAG
 # ==========================================
 
+@app.get("/api/analises-ao-vivo", tags=["Análises Ao Vivo"])
+def get_live_analyses():
+    """Retorna lista de jogos ao vivo com análises processadas."""
+    try:
+        analises = rag_service.analyze_and_cache_live_matches()
+        return {
+            "sucesso": True,
+            "quantidade": len(analises),
+            "analises": analises,
+            "timestamp": time.time(),
+        }
+    except Exception as e:
+        print(f"Erro ao buscar análises ao vivo: {e}")
+        return {
+            "sucesso": False,
+            "quantidade": 0,
+            "analises": [],
+            "erro": str(e),
+        }
+
+
+@app.get("/api/edson-recommendations", tags=["Edson"])
+def get_edson_recommendations():
+    """Retorna TOP 2 jogos ao vivo para Edson recomendar."""
+    try:
+        recommendations = rag_service.get_top_live_recommendations(limit=2)
+        return {
+            "sucesso": True,
+            "recomendacoes": recommendations,
+            "timestamp": time.time(),
+        }
+    except Exception as e:
+        print(f"Erro ao buscar recomendações: {e}")
+        return {"sucesso": False, "recomendacoes": [], "erro": str(e)}
+
 @app.get("/api/analisar/{match_id}", tags=["Edson RAG"])
 def analisar_partida(match_id: str):
     """
@@ -194,9 +263,30 @@ def edson_chat(request: ChatRequest):
         resposta_texto = (response.text or "").strip()
 
         if not resposta_texto:
-            return {"response": "Nao consegui gerar resposta com base nos dados atuais do banco."}
-
-        return {"response": resposta_texto}
+            resposta_texto = "Nao consegui gerar resposta com base nos dados atuais do banco."
     except Exception as e:
         print(f"Erro no chat: {e}")
-        return {"response": "Desculpe, ocorreu um erro ao consultar o contexto RAG do Edson."}
+        resposta_texto = "Desculpe, ocorreu um erro ao consultar o contexto RAG do Edson."
+
+    keywords = ["recomenda", "melhor", "qual jogo", "qual apostar", "dica"]
+    if any(word in request.message.lower() for word in keywords):
+        try:
+            recommendations = rag_service.get_top_live_recommendations(limit=2)
+            if recommendations:
+                for rec in recommendations:
+                    match_id = rec.get("match_id")
+                    home = rec.get("home_team")
+                    away = rec.get("away_team")
+                    confidence = rec.get("analysis", {}).get("confidenceScore", 0)
+
+                    bet_suggestion = rag_service.get_bet_suggestion(match_id, "balanced")
+                    if bet_suggestion:
+                        selection = bet_suggestion.get("selection", "Analise")
+                        odds = bet_suggestion.get("odds", 1.5)
+
+                        resposta_texto += f"\n\nTop recomendacao: {home} vs {away} (Confianca: {confidence}%)"
+                        resposta_texto += f"\n[[BET:{selection}|{odds}|{match_id}|winner]]"
+        except Exception as e:
+            print(f"Erro ao injetar recomendações: {e}")
+
+    return {"response": resposta_texto}

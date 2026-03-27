@@ -9,6 +9,7 @@ import MatchCard from '@/components/Match/MatchCard';
 import OddsChip from '@/components/Match/OddsChip';
 import EdsonWidget from '@/components/Edson/EdsonWidget';
 import PromoCarousel from '@/components/PromoCarousel/PromoCarousel';
+import LiveMatchesCarousel from '@/components/Analysis/LiveMatchesCarousel';
 import styles from './HomePage.module.css';
 
 /**
@@ -40,17 +41,19 @@ export default function HomePage() {
       {/* Promotional Carousel */}
       <PromoCarousel />
 
+      {/* Live analyses shared for all users */}
+      <LiveMatchesCarousel />
+
       {/* Featured Hero */}
-      {featured && !loading && (
-        <FeaturedHero match={featured} />
-      )}
+      {featured && !loading && <FeaturedHero match={featured} />}
 
       {/* Live Odds Section */}
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
           <span className={styles.sectionTitle}>ODDS ATUALIZANDO…</span>
           <span className={styles.liveCount}>
-            <span className={styles.liveWave}>●</span> {liveMatches.length} GAMES
+            <span className={styles.liveWave}>●</span> {liveMatches.length}{' '}
+            GAMES
           </span>
         </div>
 
@@ -59,10 +62,9 @@ export default function HomePage() {
             ? Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className={`skeleton ${styles.skeletonCard}`} />
               ))
-            : liveMatches.slice(0, 4).map((match) => (
-                <MatchCard key={match.id} match={match} />
-              ))
-          }
+            : liveMatches
+                .slice(0, 4)
+                .map((match) => <MatchCard key={match.id} match={match} />)}
         </div>
       </section>
 
@@ -70,7 +72,9 @@ export default function HomePage() {
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
           <span className={styles.sectionTitle}>PRÓXIMOS JOGOS</span>
-          <Link to={ROUTES.LIVE} className={styles.seeAll}>VER TODOS</Link>
+          <Link to={ROUTES.LIVE} className={styles.seeAll}>
+            VER TODOS
+          </Link>
         </div>
 
         <div className={styles.cardGrid}>
@@ -80,8 +84,7 @@ export default function HomePage() {
               ))
             : upcoming.map((match) => (
                 <MatchCard key={match.id} match={match} showAnalysis={false} />
-              ))
-          }
+              ))}
         </div>
       </section>
     </div>
@@ -108,16 +111,22 @@ function FeaturedHero({ match }) {
         {/* League & Live badge */}
         <div className={styles.heroMeta}>
           <span className={styles.liveBadge}>● LIVE {match.minute}</span>
-          <span className={styles.heroLeague}>{match.league.split('—')[1]?.trim()}</span>
+          <span className={styles.heroLeague}>
+            {match.league.split('—')[1]?.trim()}
+          </span>
         </div>
 
         {/* Score */}
         <div className={styles.heroScore}>
-          <span className={styles.heroTeam}>{match.home.name.toUpperCase()}</span>
+          <span className={styles.heroTeam}>
+            {match.home.name.toUpperCase()}
+          </span>
           <span className={styles.heroNum}>{match.homeScore}</span>
           <span className={styles.heroVs}>-</span>
           <span className={styles.heroNum}>{match.awayScore}</span>
-          <span className={styles.heroTeam}>{match.away.name.toUpperCase()}</span>
+          <span className={styles.heroTeam}>
+            {match.away.name.toUpperCase()}
+          </span>
         </div>
 
         <span className={styles.heroCta}>VER ANÁLISE →</span>

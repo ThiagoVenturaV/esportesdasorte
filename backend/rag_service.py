@@ -281,3 +281,120 @@ O JSON deve respeitar ESTRITAMENTE esta estrutura e chaves para o componente Rea
             "predictedWinner": "Indefinido",
             "confidenceScore": 0
         }
+
+
+# Cache dedicado para análises ao vivo compartilhadas entre usuários.
+_cache_live_analyses = []
+_cache_timestamp = 0
+
+
+def analyze_and_cache_live_matches(limit=10):
+    """
+    Processa os jogos ao vivo, gera análise com Gemini e mantém cache por 10 minutos.
+    """
+    global _cache_live_analyses, _cache_timestamp
+
+    if _cache_live_analyses and (time.time() - _cache_timestamp) < 600:
+        return _cache_live_analyses
+
+    try:
+        live_matches = fetch_live_matches()
+        if not live_matches:
+            print("[Live Analysis] Nenhum jogo ao vivo disponível")
+            return _cache_live_analyses
+
+        top_matches = live_matches[:limit]
+        analyses = []
+
+        for match in top_matches:
+            try:
+                match_id = str(match.get("id", ""))
+                if not match_id:
+                    continue
+
+                home_team = match.get("home", {}).get("name", "Time A")
+                away_team = match.get("away", {}).get("name", "Time B")
+                score = str(match.get("ss", "0-0"))
+                score_parts = score.split("-") if "-" in score else ["0", "0"]
+
+                analysis = analyze_match_with_gemini(match_id)
+
+                analyses.append({
+                    "match_id": match_id,
+                    "home_team": home_team,
+                    "away_team": away_team,
+                    "live_data": {
+                        "minute": match.get("time", match.get("minute", 0)),
+                        "home_score": score_parts[0].strip() if len(score_parts) > 0 else "0",
+                        "away_score": score_parts[1].strip() if len(score_parts) > 1 else "0",
+                    },
+                    "analysis": analysis,
+                    "timestamp": time.time(),
+                })
+            except Exception as e:
+                print(f"[Live Analysis] Erro processando partida: {e}")
+
+        _cache_live_analyses = analyses
+        _cache_timestamp = time.time()
+        print(f"[Live Analysis] Processadas {len(analyses)} análises")
+        return _cache_live_analyses
+    except Exception as e:
+        print(f"[Live Analysis] Erro geral: {e}")
+        return _cache_live_analyses
+
+
+def get_bet_suggestion(match_id: str, style: str = "balanced"):
+    """
+    Gera sugestão de aposta a partir das probabilidades da análise.
+    """
+    try:
+        match_data = next((m for m in _cache_live_analyses if m.get("match_id") == str(match_id)), None)
+        if not match_data:
+            return {"selection": "Analise", "odds": 1.5}
+
+        analysis = match_data.get("analysis", {}) or {}
+        win_prob = analysis.get("winProbability", {}) or {}
+        home_prob = float(win_prob.get("home", 33))
+        draw_prob = float(win_prob.get("draw", 33))
+        away_prob = float(win_prob.get("away", 34))
+
+        style_threshold = {
+            "conservative": 65,
+            "balanced": 50,
+            "aggressive": 35,
+        }.get(style, 50)
+
+        options = [
+            ("Home", home_prob, 1.95),
+            ("Draw", draw_prob, 3.20),
+            ("Away", away_prob, 1.95),
+        ]
+        best = max(options, key=lambda x: x[1])
+
+        if best[1] >= style_threshold:
+            return {"selection": best[0], "odds": best[2]}
+
+        return {"selection": "Analise", "odds": 1.5}
+    except Exception as e:
+        print(f"[Bet Suggestion] Erro: {e}")
+        return {"selection": "Analise", "odds": 1.5}
+
+
+def get_top_live_recommendations(limit: int = 2):
+    """
+    Retorna TOP jogos ao vivo ordenados por confidence score.
+    """
+    try:
+        analyses = analyze_and_cache_live_matches(limit=10)
+        if not analyses:
+            return []
+
+        ordered = sorted(
+            analyses,
+            key=lambda item: (item.get("analysis", {}) or {}).get("confidenceScore", 0),
+            reverse=True,
+        )
+        return ordered[:limit]
+    except Exception as e:
+        print(f"[Top Recommendations] Erro: {e}")
+        return []
