@@ -16,6 +16,7 @@ import rag_service
 load_dotenv()
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-lite")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
@@ -30,7 +31,7 @@ allow_credentials = "*" not in cors_origins
 
 app = FastAPI(
     title="Assistente de Análise Esportiva (Edson)",
-    description="Backend estruturado com PostgreSQL Neon, BetsAPI e Gemini 2.5 Lite via RAG.",
+    description="Backend estruturado com PostgreSQL Neon, BetsAPI e Gemini Lite via RAG.",
     version="2.0.0"
 )
 
@@ -275,7 +276,7 @@ def edson_chat(request: ChatRequest):
         "Nao use web. Responda em portugues em no maximo 3 paragrafos."
     )
 
-    model_chat = genai.GenerativeModel("gemini-1.5-flash", system_instruction=prompt_sistema)
+    model_chat = genai.GenerativeModel(GEMINI_MODEL, system_instruction=prompt_sistema)
 
     gemini_history = []
     for m in request.history:

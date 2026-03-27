@@ -10,15 +10,15 @@ load_dotenv()
 
 # Configurações
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-lite")
 BETS_API_TOKEN = os.getenv("BETS_API_TOKEN", "248558-x464EYT2kttm4b")
 
 # Configurar o Gemini
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
     
-# Usar o modelo Flash (Light/Rápido) recomendado para tarefas JSON estruturadas - Gemini 2.5 Lite equivalente ou 1.5 Flash
-# "gemini-1.5-flash"
-model = genai.GenerativeModel("gemini-1.5-flash")
+# Usar Gemini Lite para custo baixo e latencia menor.
+model = genai.GenerativeModel(GEMINI_MODEL)
 
 # Cache p/ evitar flood na BetsAPI
 _cache_live_matches = None

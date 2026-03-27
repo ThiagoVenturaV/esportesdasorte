@@ -26,7 +26,7 @@ npm run preview    # preview do bundle
 
 ## Variáveis de Ambiente (Edson)
 
-O chat do Edson agora usa uma função serverless em `api/edson/chat` para proteger a chave da IA no backend.
+O chat do Edson usa o backend FastAPI no Railway, com RAG no Neon e Gemini Lite.
 
 Crie um arquivo `.env` a partir de `.env.example`:
 
@@ -37,15 +37,14 @@ cp .env.example .env
 Defina as variáveis:
 
 ```env
-GROQ_API_KEY=chave_secreta_backend
-VITE_GROQ_KEY=chave_opcional_para_fallback_local
 VITE_EDSON_MAX_HISTORY=10
 VITE_TYPEWRITER_SPEED=18
 EDSON_MAX_HISTORY=10
 VITE_BACKEND_URL=https://esportesdasorte-production.up.railway.app
+GEMINI_API_KEY=sua_chave_gemini
+GEMINI_MODEL=gemini-2.0-flash-lite
+NEON_URL=postgresql://...
 ```
-
-No Vercel, configure pelo menos `GROQ_API_KEY` em `Settings > Environment Variables` e faça novo deploy.
 
 Para produção integrada com backend FastAPI no Railway, configure também no backend:
 

@@ -43,7 +43,7 @@ CONTRATO_ANALISE = {
     "vencedor_provavel":   None,  # str   — Nome do time favorito ou "Equilíbrio"
     "confianca_vencedor":  None,  # str   — "Alta" | "Média" | "Baixa"
     "risco_cartao":        None,  # dict  — {"nome": str, "risco": float}
-    "narrativa_ia":        None,  # str   — Texto gerado pelo Groq/Llama
+    "narrativa_ia":        None,  # str   — Texto gerado pelo Gemini Lite
     "movimento_destaque":  None,  # str   — Variação notável de odds, ou None
     "alerta":              None,  # str   — Insight especial, ou None
     "probabilidades": {
