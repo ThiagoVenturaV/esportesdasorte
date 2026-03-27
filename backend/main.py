@@ -149,36 +149,51 @@ def analisar_partida(match_id: str):
 @app.post("/api/chat", tags=["Edson Chat"])
 def edson_chat(request: ChatRequest):
     """
-    Substitui a chamada direta do frontend para o Google.
-    Permite injetar contexto do Neon DB antes de mandar para o Gemini.
+    Chat do Edson com contexto RAG vindo do banco Neon.
     """
-    # Podemos buscar um super-contexto RAG aqui se quisermos, 
-    # ou usar a ferramenta nativa do genai
+    if not GEMINI_API_KEY:
+        return {"response": "Desculpe, o Edson esta temporariamente sem configuracao da IA no backend."}
+
     prompt_sistema = (
-        "Você é Edson, um assistente digital focado em futebol baseado em inteligência artificial e banco de dados. "
-        "Não busque na web. Baseie suas respostas na lógica esportiva. Você opera a partir das bases do StatsBomb. "
-        "Responda ao usuário com dicas, odds e análises diretas. Máximo de 3 parágrafos."
+        "Voce e Edson, assistente de futebol orientado por dados do banco. "
+        "Nunca invente fatos. Se faltar dado no contexto, diga claramente que nao encontrou no banco. "
+        "Quando citar partida, inclua id_partida e placar exato quando disponivel. "
+        "Nao use web. Responda em portugues em no maximo 3 paragrafos."
     )
-    
-    # Inicializa modelo para chat generico
+
     model_chat = genai.GenerativeModel("gemini-1.5-flash", system_instruction=prompt_sistema)
-    
-    # Conversão do historico frontend para historico gemini sdk
+
     gemini_history = []
     for m in request.history:
         gemini_history.append({
             "role": m.get("role", "user"),
-            "parts": [p.get("text", "") for p in m.get("parts", [{"text":""}])]
+            "parts": [p.get("text", "") for p in m.get("parts", [{"text": ""}])],
         })
-        
+
     chat = model_chat.start_chat(history=gemini_history)
-    
+
     try:
-        response = chat.send_message(request.message)
-        resposta_texto = response.text
-        
-        # Opcional: Salvar conversa no DB
+        rag_context = rag_service.build_chat_rag_context(request.message, limit=8)
+        rag_context_text = str(rag_context) if rag_context else "[]"
+
+        grounded_message = (
+            "[CONTEXTO_RAG_DO_BANCO_NEON]\n"
+            f"{rag_context_text}\n\n"
+            "[REGRAS]\n"
+            "- Use prioritariamente os dados do CONTEXTO_RAG_DO_BANCO_NEON.\n"
+            "- Nao afirme fatos que nao estejam no contexto.\n"
+            "- Se nao houver dado suficiente, informe essa limitacao de forma objetiva.\n\n"
+            "[PERGUNTA_USUARIO]\n"
+            f"{request.message}"
+        )
+
+        response = chat.send_message(grounded_message)
+        resposta_texto = (response.text or "").strip()
+
+        if not resposta_texto:
+            return {"response": "Nao consegui gerar resposta com base nos dados atuais do banco."}
+
         return {"response": resposta_texto}
     except Exception as e:
         print(f"Erro no chat: {e}")
-        return {"response": "Desculpe, ocorreu um erro na nuvem neural do Edson."}
+        return {"response": "Desculpe, ocorreu um erro ao consultar o contexto RAG do Edson."}

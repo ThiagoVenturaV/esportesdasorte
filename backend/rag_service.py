@@ -24,6 +24,21 @@ model = genai.GenerativeModel("gemini-1.5-flash")
 _cache_live_matches = None
 _cache_time = 0
 
+def _tokenize_query(query: str):
+    stop_words = {
+        "de", "da", "do", "das", "dos", "a", "o", "e", "em", "com", "para",
+        "que", "qual", "como", "foi", "sera", "ser", "uma", "um", "no", "na",
+        "por", "sobre", "jogo", "partida", "edson", "placar", "resultado", "me",
+    }
+    tokens = []
+    for raw in str(query or "").lower().replace("?", " ").replace(",", " ").split():
+        token = raw.strip()
+        if len(token) < 3 or token in stop_words:
+            continue
+        tokens.append(token)
+    return tokens[:8]
+
+
 def fetch_live_matches():
     global _cache_live_matches, _cache_time
     # Cache de 30 segundos
@@ -40,8 +55,68 @@ def fetch_live_matches():
             return _cache_live_matches
     except Exception as e:
         print(f"Erro BetsAPI: {e}")
-    
+
     return []
+
+
+def build_chat_rag_context(user_message: str, limit: int = 8):
+    """
+    Recupera contexto factual do Neon para ancorar o chat do Edson.
+    Retorna lista de partidas relevantes baseada em termos da pergunta.
+    """
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            tokens = _tokenize_query(user_message)
+
+            if tokens:
+                clauses = []
+                values = []
+                for token in tokens:
+                    pattern = f"%{token}%"
+                    clauses.append("(time_casa ILIKE %s OR time_fora ILIKE %s OR competicao ILIKE %s OR temporada ILIKE %s)")
+                    values.extend([pattern, pattern, pattern, pattern])
+
+                sql = f"""
+                    SELECT id_partida, time_casa, time_fora, gols_casa, gols_fora, competicao, temporada
+                    FROM tb_partida_historico
+                    WHERE {' OR '.join(clauses)}
+                    ORDER BY id_partida DESC
+                    LIMIT %s
+                """
+                values.append(limit)
+                cur.execute(sql, values)
+            else:
+                cur.execute(
+                    """
+                    SELECT id_partida, time_casa, time_fora, gols_casa, gols_fora, competicao, temporada
+                    FROM tb_partida_historico
+                    ORDER BY id_partida DESC
+                    LIMIT %s
+                    """,
+                    (limit,),
+                )
+
+            rows = cur.fetchall() or []
+            context_items = []
+            for row in rows:
+                context_items.append({
+                    "id_partida": str(row.get("id_partida", "")),
+                    "time_casa": row.get("time_casa", ""),
+                    "time_fora": row.get("time_fora", ""),
+                    "placar": f"{row.get('gols_casa', 0)}x{row.get('gols_fora', 0)}",
+                    "competicao": row.get("competicao", ""),
+                    "temporada": row.get("temporada", ""),
+                })
+
+            return context_items
+    except Exception as e:
+        print(f"Erro ao montar contexto RAG do chat: {e}")
+        return []
+    finally:
+        if conn:
+            conn.close()
 
 def get_historical_context(home_team, away_team):
     """
