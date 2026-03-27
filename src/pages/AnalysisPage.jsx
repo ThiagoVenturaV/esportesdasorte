@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getMatchById } from '@/api/matches';
-import { getMatchAnalysis } from '@/api/analysis';
+import { getMatchAnalysis, getSavedMatchAnalysis } from '@/api/analysis';
 import { ROUTES } from '@/config/routes';
 import TeamShield from '@/components/TeamShield';
 import {
@@ -36,23 +36,28 @@ export default function AnalysisPage() {
     async function loadData() {
       setLoading(true);
 
-      let m = null;
-      if (
+      const hasLivePreload =
         preloadedLiveMatch?.match_id &&
-        String(preloadedLiveMatch.match_id) === String(matchId)
-      ) {
-        m = mapLiveAnalysisToMatch(preloadedLiveMatch);
-      }
+        String(preloadedLiveMatch.match_id) === String(matchId);
 
-      if (!m) {
-        m = await getMatchById(matchId);
-      }
+      const matchPromise = hasLivePreload
+        ? Promise.resolve(mapLiveAnalysisToMatch(preloadedLiveMatch))
+        : getMatchById(matchId);
+
+      const savedAnalysisPromise = preloadedAnalysis
+        ? Promise.resolve(preloadedAnalysis)
+        : getSavedMatchAnalysis(matchId);
+
+      const [m, savedAnalysis] = await Promise.all([
+        matchPromise,
+        savedAnalysisPromise,
+      ]);
 
       if (!active) return;
 
       setMatch(m);
 
-      let a = preloadedAnalysis;
+      let a = savedAnalysis;
       if (!a) {
         a = await getMatchAnalysis(matchId, m);
       }
