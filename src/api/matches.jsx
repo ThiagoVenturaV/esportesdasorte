@@ -70,12 +70,16 @@ function mapFixtureToMatch(
     home: {
       name: homeName,
       shortName: homeName.substring(0, 3).toUpperCase(),
-      logo: <TeamShield name={homeName} externalId={extractTeamId(f, 'home')} />,
+      logo: (
+        <TeamShield name={homeName} externalId={extractTeamId(f, 'home')} />
+      ),
     },
     away: {
       name: awayName,
       shortName: awayName.substring(0, 3).toUpperCase(),
-      logo: <TeamShield name={awayName} externalId={extractTeamId(f, 'away')} />,
+      logo: (
+        <TeamShield name={awayName} externalId={extractTeamId(f, 'away')} />
+      ),
     },
     homeScore,
     awayScore,
@@ -194,31 +198,6 @@ export async function getUpcomingMatches(filters = {}) {
  * Returns a single match by id.
  */
 export async function getMatchById(id) {
-  // Demo Fallback para IDs Mockados
-  if (id === 'match-001' || id === '802107412') {
-    return {
-      id: String(id),
-      status: 'live',
-      sport: 'soccer',
-      league: 'BRASILEIRÃO SÉRIE A',
-      home: { 
-        name: 'Botafogo', 
-        shortName: 'BOT', 
-        logo: <TeamShield name="Botafogo" externalId="bot-mock" /> 
-      },
-      away: { 
-        name: 'Santos', 
-        shortName: 'SAN', 
-        logo: <TeamShield name="Santos" externalId="san-mock" /> 
-      },
-      homeScore: 1,
-      awayScore: 0,
-      minute: "32'",
-      period: '1º Tempo',
-      odds: { home: 1.65, draw: 3.20, away: 5.50 }
-    };
-  }
-
   try {
     const fixtureId = Number(id);
     if (isNaN(fixtureId)) return null;
