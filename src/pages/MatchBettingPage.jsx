@@ -57,11 +57,26 @@ export default function MatchBettingPage() {
     }
 
     const markets = Array.isArray(match.markets) ? match.markets : [];
-    const candidateMarkets = marketParam
-      ? markets.filter(
-          (m) => normalizeText(m.name) === normalizeText(marketParam),
-        )
-      : markets;
+    let candidateMarkets = markets;
+    if (marketParam) {
+      const marketParamNorm = normalizeText(marketParam);
+      const strictMatches = markets.filter(
+        (m) => normalizeText(m.name) === marketParamNorm,
+      );
+
+      // Compatibiliza nomes de mercado entre endpoints diferentes
+      const fuzzyMatches = strictMatches.length
+        ? strictMatches
+        : markets.filter((m) => {
+            const marketNameNorm = normalizeText(m.name);
+            return (
+              marketNameNorm.includes(marketParamNorm) ||
+              marketParamNorm.includes(marketNameNorm)
+            );
+          });
+
+      candidateMarkets = fuzzyMatches.length ? fuzzyMatches : markets;
+    }
 
     let matched = null;
     for (const market of candidateMarkets) {
