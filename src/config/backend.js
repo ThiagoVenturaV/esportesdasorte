@@ -11,6 +11,8 @@ const DEFAULT_BACKEND_FALLBACK_URL = import.meta.env.PROD
   ? DEFAULT_PRODUCTION_BACKEND_FALLBACK
   : '';
 
+const DEFAULT_BACKEND_TIMEOUT_MS = import.meta.env.PROD ? 8000 : 12000;
+
 function normalizeBackendUrl(rawUrl) {
   const fallback = DEFAULT_BACKEND_URL.replace(/\/$/, '');
   const value = String(rawUrl || '').trim();
@@ -42,6 +44,36 @@ export const BACKEND_FALLBACK_URL = normalizeBackendUrl(
   import.meta.env.VITE_BACKEND_URL_FALLBACK || DEFAULT_BACKEND_FALLBACK_URL,
 );
 
+const BACKEND_TIMEOUT_MS = Number.parseInt(
+  import.meta.env.VITE_BACKEND_TIMEOUT_MS || `${DEFAULT_BACKEND_TIMEOUT_MS}`,
+  10,
+);
+
+function withRequestTimeout(options = {}, timeoutMs = BACKEND_TIMEOUT_MS) {
+  const canUseTimeout = Number.isFinite(timeoutMs) && timeoutMs > 0;
+  if (!canUseTimeout) {
+    return { options, cleanup: () => {} };
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const existingSignal = options?.signal;
+
+  if (existingSignal) {
+    existingSignal.addEventListener('abort', () => controller.abort(), {
+      once: true,
+    });
+  }
+
+  return {
+    options: {
+      ...options,
+      signal: controller.signal,
+    },
+    cleanup: () => clearTimeout(timeoutId),
+  };
+}
+
 function buildBackendCandidates() {
   const candidates = [BACKEND_URL, BACKEND_FALLBACK_URL].filter(Boolean);
   return Array.from(new Set(candidates));
@@ -63,7 +95,12 @@ export async function fetchWithBackendFallback(pathOrUrl, options = {}) {
 
   // Absolute URLs keep their original behavior (no endpoint fallback rewrite).
   if (/^https?:\/\//i.test(input)) {
-    return fetch(input, options);
+    const { options: timedOptions, cleanup } = withRequestTimeout(options);
+    try {
+      return await fetch(input, timedOptions);
+    } finally {
+      cleanup();
+    }
   }
 
   const path = input.startsWith('/') ? input : `/${input}`;
@@ -75,7 +112,13 @@ export async function fetchWithBackendFallback(pathOrUrl, options = {}) {
     const url = `${base}${path}`;
 
     try {
-      const response = await fetch(url, options);
+      const { options: timedOptions, cleanup } = withRequestTimeout(options);
+      let response;
+      try {
+        response = await fetch(url, timedOptions);
+      } finally {
+        cleanup();
+      }
 
       if (response.ok) {
         return response;

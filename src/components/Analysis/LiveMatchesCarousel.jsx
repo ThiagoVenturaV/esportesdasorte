@@ -68,8 +68,8 @@ export default function LiveMatchesCarousel() {
         </h2>
         <div className={styles.headerRight}>
           <span className={styles.powered}>Edson AI</span>
-          <Link to={ROUTES.LIVE} className={styles.seeAll}>
-            VER AO VIVO
+          <Link to={ROUTES.LIVE_ANALYSIS} className={styles.seeAll}>
+            VER ANÁLISES IA
           </Link>
         </div>
       </div>
