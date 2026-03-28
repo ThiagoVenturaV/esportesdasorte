@@ -29,6 +29,7 @@ export default function AnalysisPage() {
 
   const preloadedLiveMatch = location.state?.preloadedLiveMatch ?? null;
   const preloadedAnalysis = location.state?.preloadedAnalysis ?? null;
+  const fallbackTeams = location.state?.teams ?? null;
 
   useEffect(() => {
     let active = true;
@@ -55,13 +56,16 @@ export default function AnalysisPage() {
 
       if (!active) return;
 
-      setMatch(m);
-
       let a = savedAnalysis;
       if (!a) {
         a = await getMatchAnalysis(matchId, m);
       }
       if (!active) return;
+
+      // Nunca bloquear a tela de análise por falha de match lookup.
+      const safeMatch = m || buildFallbackMatch(matchId, fallbackTeams);
+
+      setMatch(safeMatch);
 
       setAnalysis(a);
       setLoading(false);
@@ -76,7 +80,7 @@ export default function AnalysisPage() {
 
   if (loading) return <AnalysisSkeleton />;
 
-  if (!match) {
+  if (!match && !analysis) {
     return (
       <div className={styles.page}>
         <div className={styles.errorCard}>
@@ -265,6 +269,37 @@ export default function AnalysisPage() {
       </section>
     </div>
   );
+}
+
+function buildFallbackMatch(matchId, teams) {
+  const homeName = teams?.home?.name || 'Time Casa';
+  const awayName = teams?.away?.name || 'Time Fora';
+
+  return {
+    id: String(matchId || ''),
+    status: 'live',
+    sport: 'soccer',
+    league: 'Análise de Partida',
+    home: {
+      name: homeName,
+      shortName: String(homeName).slice(0, 3).toUpperCase(),
+      logo: (
+        <TeamShield name={homeName} externalId={`${matchId}-home-fallback`} />
+      ),
+    },
+    away: {
+      name: awayName,
+      shortName: String(awayName).slice(0, 3).toUpperCase(),
+      logo: (
+        <TeamShield name={awayName} externalId={`${matchId}-away-fallback`} />
+      ),
+    },
+    homeScore: 0,
+    awayScore: 0,
+    minute: '',
+    period: 'Pré-jogo',
+    odds: { home: 0, draw: 0, away: 0 },
+  };
 }
 
 function mapLiveAnalysisToMatch(liveMatch) {
