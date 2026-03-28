@@ -1,0 +1,133 @@
+.sidebar {
+  display: none; /* hidden on mobile */
+}
+
+@media (min-width: 1240px) { /* Shift to desktop sidebar only on larger screens */
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: var(--top-bar-height);
+    height: calc(100vh - var(--top-bar-height));
+    width: 280px;
+    border-left: 1px solid var(--color-border);
+    z-index: var(--z-sidebar);
+  }
+}
+
+.scrollArea {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+}
+
+/* Custom Scrollbar for Right Sidebar */
+.scrollArea::-webkit-scrollbar {
+  width: 4px;
+}
+.scrollArea::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollArea::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 99px;
+}
+
+.section {
+  background: #0d0d1a; /* Matching the dark blue in the image */
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.headerTitle {
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.leagueList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.leagueItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  transition: background var(--transition-fast);
+  cursor: pointer;
+}
+
+.leagueItem:last-child {
+  border-bottom: none;
+}
+
+.leagueItem:hover {
+  background: var(--color-bg-hover);
+}
+
+.leagueLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.flagWrap {
+  width: 20px;
+  height: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 2px;
+}
+
+.flagImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.flagPlaceholder {
+  font-size: 14px;
+  color: var(--color-text-dim);
+}
+
+.leagueName {
+  font-size: 13px;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.sportIcon {
+  color: var(--color-text-secondary);
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  opacity: 0.8;
+}
+
+.leagueItem:hover .sportIcon {
+  color: var(--color-accent);
+  opacity: 1;
+}

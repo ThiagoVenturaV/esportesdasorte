@@ -1,0 +1,205 @@
+.container {
+  background: radial-gradient(circle at 100% 100%, #1a3c7a 0%, #0d1a33 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 20px 12px;
+  color: white;
+  position: relative;
+  overflow-x: hidden;
+  border-radius: 16px;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.logoWrap {
+  margin-bottom: 15px;
+  display: flex;
+  justify-content: center;
+}
+
+.logo {
+  height: 60px;
+  width: auto;
+}
+
+.title {
+  color: #38e67d;
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: 2px;
+  margin-bottom: 5px;
+}
+
+.protocol {
+  color: #38e67d;
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.form {
+  background: rgba(26, 26, 46, 0.4);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(56, 230, 125, 0.1);
+  border-radius: 16px;
+  padding: 25px;
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.label {
+  color: #38e67d;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.inputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.inputIcon {
+  position: absolute;
+  left: 12px;
+  color: #38e67d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.input {
+  width: 100%;
+  background: transparent;
+  border: 1px solid rgba(56, 230, 125, 0.6);
+  border-radius: 6px;
+  padding: 10px 15px 10px 40px;
+  color: white;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.input::placeholder {
+  color: rgba(160, 168, 192, 0.4);
+}
+
+.submitBtn {
+  background: #38e67d;
+  color: #0d1a33;
+  padding: 14px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 800;
+  font-size: 0.95rem;
+  margin-top: 5px;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.submitBtn:active {
+  transform: scale(0.98);
+}
+
+.submitBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.feedback {
+  margin: 0;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.feedbackError {
+  color: #ff8e8e;
+}
+
+.feedbackSuccess {
+  color: #8dffb7;
+}
+
+.links {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.link {
+  color: #38e67d;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.footer {
+  margin-top: 12px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  position: relative;
+}
+
+.vLine {
+  width: 4px;
+  height: 20px;
+  background: #38e67d;
+  border-radius: 2px;
+  position: absolute;
+  left: 10px;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  background: #38e67d;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #38e67d;
+}
+
+.lockStatus {
+  position: absolute;
+  right: 10px;
+}
+
+.version {
+  font-size: 0.65rem;
+  color: rgba(160, 168, 192, 0.5);
+  margin-top: 5px;
+  text-align: center;
+}
+
+.sparkle {
+  position: absolute;
+  bottom: 15px;
+  right: 15px;
+  color: rgba(160, 168, 192, 0.5);
+  font-size: 1.2rem;
+}
