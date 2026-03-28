@@ -1,6 +1,6 @@
 import { sportingFetch, sportingGenericFetch } from '@/services/sportingtech';
 import TeamShield from '@/components/TeamShield';
-import { BACKEND_URL } from '@/config/backend';
+import { fetchWithBackendFallback } from '@/config/backend';
 import React from 'react';
 
 const LIVE_MATCHES_CACHE_KEY = 'eds_live_matches_cache_v1';
@@ -290,8 +290,8 @@ export async function getLiveMatches(filters = {}) {
     // Tentativa 3: Backend DB-first (evita tela Live vazia quando Sportingtech falha no frontend)
     if (matches.length === 0) {
       try {
-        const response = await fetch(
-          `${BACKEND_URL}/api/analises-ao-vivo?limit=0`,
+        const response = await fetchWithBackendFallback(
+          '/api/analises-ao-vivo?limit=0',
         );
         if (response.ok) {
           const payload = await response.json();

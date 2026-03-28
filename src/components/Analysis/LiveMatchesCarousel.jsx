@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { BACKEND_URL } from '@/config/backend';
+import { fetchWithBackendFallback } from '@/config/backend';
 import { useBetSlip } from '@/components/BetSlip/BetSlipContext';
 import { ROUTES } from '@/config/routes';
 import styles from './LiveMatchesCarousel.module.css';
@@ -17,8 +17,8 @@ export default function LiveMatchesCarousel() {
   const fetchAnalyses = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `${BACKEND_URL}/api/analises-ao-vivo?limit=8`,
+      const response = await fetchWithBackendFallback(
+        '/api/analises-ao-vivo?limit=8',
       );
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);

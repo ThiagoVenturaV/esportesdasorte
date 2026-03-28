@@ -1,4 +1,4 @@
-import { BACKEND_URL } from '@/config/backend';
+import { BACKEND_URL, fetchWithBackendFallback } from '@/config/backend';
 import { getAuthHeaders } from '@/services/authService';
 
 /**
@@ -40,7 +40,7 @@ export async function sendMessage(userMessage, conversationHistory = []) {
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${BACKEND_URL}/api/chat`, {
+    const response = await fetchWithBackendFallback('/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

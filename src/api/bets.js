@@ -4,7 +4,7 @@
  * Consome dados reais do backend em vez de mocks.
  */
 
-import { BACKEND_URL } from '@/config/backend';
+import { fetchWithBackendFallback } from '@/config/backend';
 import { getAuthHeaders } from '@/services/authService';
 
 /**
@@ -13,7 +13,7 @@ import { getAuthHeaders } from '@/services/authService';
  */
 export async function getApostas() {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/apostas`, {
+    const response = await fetchWithBackendFallback('/api/apostas', {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -48,13 +48,16 @@ export async function getOpenBets() {
  */
 export async function getFinishedBets() {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/apostas/finalizadas`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...getAuthHeaders(),
+    const response = await fetchWithBackendFallback(
+      '/api/apostas/finalizadas',
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
       },
-    });
+    );
 
     if (!response.ok) {
       console.warn('Falha ao buscar apostas finalizadas, retornando vazio.');
@@ -76,7 +79,7 @@ export async function getFinishedBets() {
  */
 export async function getOddsPartida(matchId) {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/odds/${matchId}`, {
+    const response = await fetchWithBackendFallback(`/api/odds/${matchId}`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
     });

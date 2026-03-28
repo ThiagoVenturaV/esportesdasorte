@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { BACKEND_URL } from '@/config/backend';
+import { fetchWithBackendFallback } from '@/config/backend';
 import { ROUTES } from '@/config/routes';
 import { SparkleIcon } from '@/components/Icons';
 import styles from './LiveAnalysisListPage.module.css';
@@ -17,8 +17,8 @@ export default function LiveAnalysisListPage() {
   const fetchAnalyses = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `${BACKEND_URL}/api/analises-ao-vivo?limit=0`,
+      const response = await fetchWithBackendFallback(
+        '/api/analises-ao-vivo?limit=0',
       );
       const data = await response.json();
       if (data?.sucesso && Array.isArray(data.analises)) {

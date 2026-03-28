@@ -5,7 +5,7 @@
  * Neon Database (historical + cache), and BetsAPI.
  */
 
-import { BACKEND_URL } from '@/config/backend';
+import { fetchWithBackendFallback } from '@/config/backend';
 import { getAuthHeaders } from '@/services/authService';
 
 /**
@@ -23,8 +23,8 @@ export async function getMatchAnalysis(matchId, matchContext = null) {
       params.set('away_team', matchContext.away.name);
     const query = params.toString();
 
-    const response = await fetch(
-      `${BACKEND_URL}/api/analisar/${matchId}${query ? `?${query}` : ''}`,
+    const response = await fetchWithBackendFallback(
+      `/api/analisar/${matchId}${query ? `?${query}` : ''}`,
       {
         method: 'GET',
         headers: {
@@ -61,8 +61,8 @@ export async function getSavedMatchAnalysis(matchId, matchContext = null) {
       params.set('away_team', matchContext.away.name);
     const query = params.toString();
 
-    const response = await fetch(
-      `${BACKEND_URL}/api/analises-salvas/${matchId}${query ? `?${query}` : ''}`,
+    const response = await fetchWithBackendFallback(
+      `/api/analises-salvas/${matchId}${query ? `?${query}` : ''}`,
       {
         method: 'GET',
         headers: {
