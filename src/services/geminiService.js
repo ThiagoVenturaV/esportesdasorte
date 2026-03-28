@@ -7,9 +7,11 @@ import { getAuthHeaders } from '@/services/authService';
  * ao invés de bater diretamente na API do Google Gemini, permitindo injetar contexto RAG.
  */
 
-const TIMEOUT_MS = 30_000; // 30s para o backend consultar Neon DB + Gemini
+const TIMEOUT_MS = 20_000; // reduz latência percebida sem cortar agressivamente
 
-const MAX_HISTORY = parseInt(import.meta.env.VITE_EDSON_MAX_HISTORY, 10) || 10;
+const MAX_HISTORY = parseInt(import.meta.env.VITE_EDSON_MAX_HISTORY, 10) || 8;
+const FAST_CACHE_TTL_MS = 120_000;
+const fastResponseCache = new Map();
 
 /**
  * Limita o histórico de conversa às últimas N mensagens (pares user/model).
@@ -17,6 +19,52 @@ const MAX_HISTORY = parseInt(import.meta.env.VITE_EDSON_MAX_HISTORY, 10) || 10;
 function trimHistory(history) {
   if (history.length <= MAX_HISTORY) return history;
   return history.slice(-MAX_HISTORY);
+}
+
+function buildFastCacheKey(userMessage, history) {
+  const msg = String(userMessage || '')
+    .trim()
+    .toLowerCase();
+  const recent = Array.isArray(history) ? history.slice(-4) : [];
+  const context = recent
+    .map((item) => {
+      const role = String(item?.role || '').toLowerCase();
+      const parts = Array.isArray(item?.parts) ? item.parts : [];
+      const text = parts
+        .map((p) => String(p?.text || ''))
+        .join(' ')
+        .trim()
+        .toLowerCase();
+      return `${role}:${text.slice(0, 180)}`;
+    })
+    .join('||');
+  return `${msg}||${context}`;
+}
+
+function getFastCachedResponse(cacheKey) {
+  const cached = fastResponseCache.get(cacheKey);
+  if (!cached) return null;
+  if (Date.now() > cached.expiresAt) {
+    fastResponseCache.delete(cacheKey);
+    return null;
+  }
+  return cached.payload;
+}
+
+function setFastCachedResponse(cacheKey, payload) {
+  fastResponseCache.set(cacheKey, {
+    expiresAt: Date.now() + FAST_CACHE_TTL_MS,
+    payload,
+  });
+
+  if (fastResponseCache.size > 120) {
+    const now = Date.now();
+    for (const [key, value] of fastResponseCache.entries()) {
+      if (value.expiresAt <= now) {
+        fastResponseCache.delete(key);
+      }
+    }
+  }
 }
 
 /**
@@ -28,6 +76,11 @@ function trimHistory(history) {
  */
 export async function sendMessage(userMessage, conversationHistory = []) {
   const trimmedHistory = trimHistory(conversationHistory);
+  const cacheKey = buildFastCacheKey(userMessage, trimmedHistory);
+  const cached = getFastCachedResponse(cacheKey);
+  if (cached) {
+    return cached;
+  }
 
   const payload = {
     message: userMessage,
@@ -98,10 +151,12 @@ export async function sendMessage(userMessage, conversationHistory = []) {
     const data = await response.json();
 
     if (data.response) {
-      return {
+      const result = {
         text: data.response.trim(),
         cta: data.cta || null,
       };
+      setFastCachedResponse(cacheKey, result);
+      return result;
     }
 
     return {
