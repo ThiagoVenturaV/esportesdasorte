@@ -8,12 +8,12 @@ import { BACKEND_URL } from '@/config/backend';
 import { getAuthHeaders } from '@/services/authService';
 
 /**
- * Busca apostas abertas do backend.
+ * Busca apostas do endpoint principal.
  * @returns {Promise<Array>}
  */
-export async function getOpenBets() {
+export async function getApostas() {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/apostas/abertas`, {
+    const response = await fetch(`${BACKEND_URL}/api/apostas`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -22,16 +22,24 @@ export async function getOpenBets() {
     });
 
     if (!response.ok) {
-      console.warn('Falha ao buscar apostas abertas, retornando vazio.');
+      console.warn('Falha ao buscar apostas, retornando vazio.');
       return [];
     }
 
     const data = await response.json();
     return data?.apostas || data || [];
   } catch (error) {
-    console.warn('Erro ao buscar apostas abertas:', error);
+    console.warn('Erro ao buscar apostas:', error);
     return [];
   }
+}
+
+/**
+ * Busca apostas abertas do backend.
+ * @returns {Promise<Array>}
+ */
+export async function getOpenBets() {
+  return getApostas();
 }
 
 /**
