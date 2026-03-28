@@ -11,3 +11,4 @@ __pycache__/
 .env.production.local
 .DS_Store
 .vscode/
+scripts/reports/

@@ -116,6 +116,7 @@
 
 .edson-widget {
   position: relative;
+  isolation: isolate;
   width: 100%;
   z-index: 50;
   margin-bottom: 8px;
@@ -127,6 +128,23 @@
 .edson-widget--open {
   flex-direction: column;
   gap: 12px;
+}
+
+/*
+ * Quando o chat abre, o painel fica ancorado exatamente na área da Ask AI bar,
+ * cobrindo a caixa de digitação da home sem ocupar a tela inteira.
+ */
+.edson-widget--open .edson-bar {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.edson-widget--open .edson-panel {
+  position: absolute;
+  top: 0;
+  left: var(--space-4, 16px);
+  right: var(--space-4, 16px);
+  z-index: 20;
 }
 
 /* ═══════════════════════════════════════════════════════════════════

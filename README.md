@@ -24,6 +24,22 @@ npm run build      # bundle de produção
 npm run preview    # preview do bundle
 ```
 
+### Validação automática pós-push (Painel QA)
+
+Para rodar checklist automaticamente após cada `git push`:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Também pode executar manualmente:
+
+```bash
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/post_push_panel.ps1
+```
+
+O relatório é salvo em `scripts/reports/`.
+
 ## Variáveis de Ambiente (Edson)
 
 O chat do Edson usa o backend FastAPI no Railway, com RAG no Neon e Gemini Lite.
