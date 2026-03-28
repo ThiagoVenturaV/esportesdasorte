@@ -34,7 +34,9 @@ function normalizeAnalysisPayload(raw) {
     commentary:
       commentary.length > 0
         ? commentary.map((x) => String(x))
-        : ['Análise temporariamente simplificada por indisponibilidade parcial de dados.'],
+        : [
+            'Análise temporariamente simplificada por indisponibilidade parcial de dados.',
+          ],
     goalProbabilityNextMinute: toInt(raw.goalProbabilityNextMinute, 42),
     cardRiskHome: toInt(raw.cardRiskHome, 38),
     cardRiskAway: toInt(raw.cardRiskAway ?? raw.cardRisskAway, 36),

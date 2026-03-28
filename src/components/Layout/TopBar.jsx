@@ -48,10 +48,7 @@ export default function TopBar({ onMenuClick }) {
   };
 
   const displayName =
-    currentUser?.nome_usuario ||
-    currentUser?.nome ||
-    currentUser?.name ||
-    '';
+    currentUser?.nome_usuario || currentUser?.nome || currentUser?.name || '';
 
   const initials = displayName
     ? displayName

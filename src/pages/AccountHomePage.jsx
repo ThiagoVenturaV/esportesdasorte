@@ -24,7 +24,8 @@ function formatPhone(phone) {
 
 export default function AccountHomePage() {
   const user = getCurrentUser() || {};
-  const displayName = user.nome_usuario || user.nome || user.name || 'apostador';
+  const displayName =
+    user.nome_usuario || user.nome || user.name || 'apostador';
   const displayEmail = user.email_usuario || user.email || 'Não informado';
 
   return (
