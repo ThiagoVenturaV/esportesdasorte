@@ -3,6 +3,8 @@ import TeamShield from '@/components/TeamShield';
 import { fetchWithBackendFallback } from '@/config/backend';
 import React from 'react';
 
+const LIVE_ANALYSES_FALLBACK_LIMIT = 30;
+
 const LIVE_MATCHES_CACHE_KEY = 'eds_live_matches_cache_v1';
 const LIVE_MATCHES_CACHE_TTL_MS = 45 * 1000;
 
@@ -291,7 +293,7 @@ export async function getLiveMatches(filters = {}) {
     if (matches.length === 0) {
       try {
         const response = await fetchWithBackendFallback(
-          '/api/analises-ao-vivo?limit=0',
+          `/api/analises-ao-vivo?limit=${LIVE_ANALYSES_FALLBACK_LIMIT}`,
         );
         if (response.ok) {
           const payload = await response.json();

@@ -6,6 +6,8 @@ import { ROUTES } from '@/config/routes';
 import { SparkleIcon } from '@/components/Icons';
 import styles from './LiveAnalysisListPage.module.css';
 
+const LIVE_ANALYSIS_PAGE_LIMIT = 30;
+
 /**
  * LiveAnalysisListPage — Dedicated page to view all live matches with AI analysis.
  */
@@ -18,7 +20,7 @@ export default function LiveAnalysisListPage() {
     try {
       setLoading(true);
       const response = await fetchWithBackendFallback(
-        '/api/analises-ao-vivo?limit=0',
+        `/api/analises-ao-vivo?limit=${LIVE_ANALYSIS_PAGE_LIMIT}`,
       );
       const data = await response.json();
       if (data?.sucesso && Array.isArray(data.analises)) {
