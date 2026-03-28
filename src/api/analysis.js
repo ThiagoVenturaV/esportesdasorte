@@ -46,6 +46,25 @@ function normalizeAnalysisPayload(raw) {
   };
 }
 
+function buildFallbackAnalysis(matchContext = null) {
+  const homeName = matchContext?.home?.name || 'Time Casa';
+  const awayName = matchContext?.away?.name || 'Time Fora';
+  return {
+    winProbability: { home: 34, draw: 32, away: 34 },
+    confidenceScore: 52,
+    predictedWinner: homeName,
+    commentary: [
+      `Análise de ${homeName} x ${awayName} temporariamente indisponível. Exibindo versão simplificada.`,
+    ],
+    goalProbabilityNextMinute: 42,
+    cardRiskHome: 38,
+    cardRiskAway: 36,
+    penaltyRisk: 18,
+    momentumHome: 51,
+    momentumAway: 49,
+  };
+}
+
 /**
  * Returns deep analysis for a match from the AI Backend.
  * @param {string} matchId
@@ -81,14 +100,17 @@ export async function getMatchAnalysis(matchId, matchContext = null) {
     }
 
     const analysisData = await response.json();
-    return normalizeAnalysisPayload(analysisData);
+    return (
+      normalizeAnalysisPayload(analysisData) ||
+      buildFallbackAnalysis(matchContext)
+    );
   } catch (error) {
     console.error('Error fetching AI analysis from backend:', error);
     const savedFallback = await getSavedMatchAnalysis(matchId, matchContext);
     if (savedFallback) {
       return normalizeAnalysisPayload(savedFallback);
     }
-    return null;
+    return buildFallbackAnalysis(matchContext);
   }
 }
 

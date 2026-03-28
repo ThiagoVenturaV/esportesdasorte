@@ -31,44 +31,76 @@ export default function AnalysisPage() {
   const preloadedAnalysis = location.state?.preloadedAnalysis ?? null;
   const fallbackTeams = location.state?.teams ?? null;
 
+  function toMatchContext(matchData) {
+    if (!matchData?.home?.name || !matchData?.away?.name) return null;
+    return {
+      home: { name: matchData.home.name },
+      away: { name: matchData.away.name },
+    };
+  }
+
   useEffect(() => {
     let active = true;
 
     async function loadData() {
       setLoading(true);
+      try {
+        const hasLivePreload =
+          preloadedLiveMatch?.match_id &&
+          String(preloadedLiveMatch.match_id) === String(matchId);
 
-      const hasLivePreload =
-        preloadedLiveMatch?.match_id &&
-        String(preloadedLiveMatch.match_id) === String(matchId);
+        const preloadedMatch = hasLivePreload
+          ? mapLiveAnalysisToMatch(preloadedLiveMatch)
+          : null;
 
-      const matchPromise = hasLivePreload
-        ? Promise.resolve(mapLiveAnalysisToMatch(preloadedLiveMatch))
-        : getMatchById(matchId);
+        const contextFromState =
+          toMatchContext(preloadedMatch) ||
+          (fallbackTeams
+            ? {
+                home: { name: fallbackTeams?.home?.name || 'Time Casa' },
+                away: { name: fallbackTeams?.away?.name || 'Time Fora' },
+              }
+            : null);
 
-      const savedAnalysisPromise = preloadedAnalysis
-        ? Promise.resolve(preloadedAnalysis)
-        : getSavedMatchAnalysis(matchId);
+        const matchPromise = preloadedMatch
+          ? Promise.resolve(preloadedMatch)
+          : getMatchById(matchId);
 
-      const [m, savedAnalysis] = await Promise.all([
-        matchPromise,
-        savedAnalysisPromise,
-      ]);
+        const savedAnalysisPromise = preloadedAnalysis
+          ? Promise.resolve(preloadedAnalysis)
+          : getSavedMatchAnalysis(matchId, contextFromState);
 
-      if (!active) return;
+        const [m, savedAnalysis] = await Promise.all([
+          matchPromise,
+          savedAnalysisPromise,
+        ]);
 
-      let a = savedAnalysis;
-      if (!a) {
-        a = await getMatchAnalysis(matchId, m);
+        if (!active) return;
+
+        const safeMatch = m || buildFallbackMatch(matchId, fallbackTeams);
+        const effectiveContext = toMatchContext(safeMatch);
+
+        let a = savedAnalysis;
+        if (!a) {
+          a = await getSavedMatchAnalysis(matchId, effectiveContext);
+        }
+        if (!a) {
+          a = await getMatchAnalysis(matchId, effectiveContext);
+        }
+        if (!active) return;
+
+        setMatch(safeMatch);
+        setAnalysis(a);
+      } catch (error) {
+        console.error('[AnalysisPage] Erro ao carregar análise:', error);
+        if (!active) return;
+        setMatch(buildFallbackMatch(matchId, fallbackTeams));
+        setAnalysis(null);
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
       }
-      if (!active) return;
-
-      // Nunca bloquear a tela de análise por falha de match lookup.
-      const safeMatch = m || buildFallbackMatch(matchId, fallbackTeams);
-
-      setMatch(safeMatch);
-
-      setAnalysis(a);
-      setLoading(false);
     }
 
     loadData();
@@ -76,7 +108,7 @@ export default function AnalysisPage() {
     return () => {
       active = false;
     };
-  }, [matchId, preloadedLiveMatch, preloadedAnalysis]);
+  }, [matchId, preloadedLiveMatch, preloadedAnalysis, fallbackTeams]);
 
   if (loading) return <AnalysisSkeleton />;
 
