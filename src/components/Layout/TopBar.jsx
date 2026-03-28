@@ -47,6 +47,21 @@ export default function TopBar({ onMenuClick }) {
     navigate(ROUTES.HOME);
   };
 
+  const displayName =
+    currentUser?.nome_usuario ||
+    currentUser?.nome ||
+    currentUser?.name ||
+    '';
+
+  const initials = displayName
+    ? displayName
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase() || '')
+        .join('')
+    : 'U';
+
   return (
     <header className={styles.bar} role="banner">
       {/* Hamburger — mobile only */}
@@ -102,13 +117,20 @@ export default function TopBar({ onMenuClick }) {
       {/* Account dropdown */}
       <div className={styles.accountWrap} ref={accountRef}>
         <button
-          className={styles.iconBtn}
+          className={`${styles.iconBtn} ${displayName ? styles.accountBtnLogged : ''}`}
           onClick={() => setAccountOpen((v) => !v)}
           aria-label="Minha conta"
           aria-haspopup="true"
           aria-expanded={accountOpen}
         >
-          <UserIcon />
+          {displayName ? (
+            <span className={styles.profileBadge}>
+              <span className={styles.profileAvatar}>{initials}</span>
+              <span className={styles.profileName}>{displayName}</span>
+            </span>
+          ) : (
+            <UserIcon />
+          )}
         </button>
 
         {accountOpen && (

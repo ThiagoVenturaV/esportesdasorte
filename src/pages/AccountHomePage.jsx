@@ -24,14 +24,14 @@ function formatPhone(phone) {
 
 export default function AccountHomePage() {
   const user = getCurrentUser() || {};
+  const displayName = user.nome_usuario || user.nome || user.name || 'apostador';
+  const displayEmail = user.email_usuario || user.email || 'Não informado';
 
   return (
     <section className={styles.page}>
       <header className={styles.header}>
         <p className={styles.badge}>CONTA LOGADA</p>
-        <h1 className={styles.title}>
-          Olá, {user.nome_usuario || 'apostador'}!
-        </h1>
+        <h1 className={styles.title}>Olá, {displayName}!</h1>
         <p className={styles.subtitle}>
           Aqui está o resumo da sua conta após o login.
         </p>
@@ -42,10 +42,10 @@ export default function AccountHomePage() {
           <h2>Dados cadastrais</h2>
           <ul>
             <li>
-              <strong>Nome:</strong> {user.nome_usuario || 'Não informado'}
+              <strong>Nome:</strong> {displayName}
             </li>
             <li>
-              <strong>E-mail:</strong> {user.email_usuario || 'Não informado'}
+              <strong>E-mail:</strong> {displayEmail}
             </li>
             <li>
               <strong>CPF:</strong> {formatCpf(user.cpf_usuario)}
