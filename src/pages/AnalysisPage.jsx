@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useLocation } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getMatchById } from '@/api/matches';
 import { getMatchAnalysis, getSavedMatchAnalysis } from '@/api/analysis';
@@ -23,6 +23,7 @@ import styles from './AnalysisPage.module.css';
 export default function AnalysisPage() {
   const { matchId } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const [match, setMatch] = useState(null);
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -110,9 +111,19 @@ export default function AnalysisPage() {
     };
   }, [matchId, preloadedLiveMatch, preloadedAnalysis, fallbackTeams]);
 
+  function handleBack() {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate(ROUTES.HOME);
+  }
+
+  const safeMatch = normalizeMatchForUi(match, matchId, fallbackTeams);
+
   if (loading) return <AnalysisSkeleton />;
 
-  if (!match && !analysis) {
+  if (!safeMatch && !analysis) {
     return (
       <div className={styles.page}>
         <div className={styles.errorCard}>
@@ -136,26 +147,30 @@ export default function AnalysisPage() {
           <h2>Análise Indisponível</h2>
           <p>
             Nossos algoritmos de IA ainda não processaram os dados para{' '}
-            {match.home.name} vs {match.away.name}.
+            {safeMatch.home.name} vs {safeMatch.away.name}.
           </p>
-          <Link to={-1} className={styles.backLink}>
+          <button
+            type="button"
+            onClick={handleBack}
+            className={styles.backLink}
+          >
             ← Voltar
-          </Link>
+          </button>
         </div>
       </div>
     );
   }
 
-  const safeAnalysis = normalizeAnalysisForUi(analysis, match);
+  const safeAnalysis = normalizeAnalysisForUi(analysis, safeMatch);
 
-  const isSoccer = match.sport === 'soccer';
+  const isSoccer = safeMatch.sport === 'soccer';
 
   return (
     <div className={styles.page}>
       {/* Back navigation */}
-      <Link to={-1} className={styles.backLink}>
+      <button type="button" onClick={handleBack} className={styles.backLink}>
         ← Voltar
-      </Link>
+      </button>
 
       {/* Match Header */}
       <motion.div
@@ -164,26 +179,26 @@ export default function AnalysisPage() {
         animate={{ opacity: 1, y: 0 }}
       >
         <div className={styles.headerTop}>
-          <span className={styles.league}>{match.league}</span>
+          <span className={styles.league}>{safeMatch.league}</span>
           <span className={styles.liveChip}>
             <span className={styles.liveDot} aria-hidden="true" /> AO VIVO{' '}
-            {match.minute}
+            {safeMatch.minute}
           </span>
         </div>
 
         <div className={styles.scoreboard}>
           <div className={styles.sbTeam}>
-            <span className={styles.sbLogo}>{match.home.logo}</span>
-            <span className={styles.sbName}>{match.home.name}</span>
+            <span className={styles.sbLogo}>{safeMatch.home.logo}</span>
+            <span className={styles.sbName}>{safeMatch.home.name}</span>
           </div>
           <div className={styles.sbScore}>
-            <span className={styles.sbNum}>{match.homeScore}</span>
+            <span className={styles.sbNum}>{safeMatch.homeScore}</span>
             <span className={styles.sbSep}>–</span>
-            <span className={styles.sbNum}>{match.awayScore}</span>
+            <span className={styles.sbNum}>{safeMatch.awayScore}</span>
           </div>
           <div className={`${styles.sbTeam} ${styles.sbTeamAway}`}>
-            <span className={styles.sbLogo}>{match.away.logo}</span>
-            <span className={styles.sbName}>{match.away.name}</span>
+            <span className={styles.sbLogo}>{safeMatch.away.logo}</span>
+            <span className={styles.sbName}>{safeMatch.away.name}</span>
           </div>
         </div>
 
@@ -205,7 +220,10 @@ export default function AnalysisPage() {
           </p>
 
           <div className={styles.betCTAWrapper}>
-            <Link to={ROUTES.BETTING(match.id)} className={styles.betCTA}>
+            <Link
+              to={ROUTES.BETTING(safeMatch.id || String(matchId || ''))}
+              className={styles.betCTA}
+            >
               APOSTAR AGORA
             </Link>
           </div>
@@ -249,8 +267,8 @@ export default function AnalysisPage() {
             home={safeAnalysis.winProbability.home}
             draw={safeAnalysis.winProbability.draw}
             away={safeAnalysis.winProbability.away}
-            homeTeam={match.home.shortName}
-            awayTeam={match.away.shortName}
+            homeTeam={safeMatch.home.shortName}
+            awayTeam={safeMatch.away.shortName}
           />
         </div>
       </section>
@@ -270,15 +288,15 @@ export default function AnalysisPage() {
           )}
           <InsightCard
             icon={<YellowCardIcon />}
-            title={`Risco de Cartão — ${match.home.shortName}`}
+            title={`Risco de Cartão — ${safeMatch.home.shortName}`}
             value={safeAnalysis.cardRiskHome}
-            description={`Nível de agressividade e faltas táticas de ${match.home.name}.`}
+            description={`Nível de agressividade e faltas táticas de ${safeMatch.home.name}.`}
           />
           <InsightCard
             icon={<YellowCardIcon />}
-            title={`Risco de Cartão — ${match.away.shortName}`}
+            title={`Risco de Cartão — ${safeMatch.away.shortName}`}
             value={safeAnalysis.cardRiskAway}
-            description={`Padrão de falta e pressão recente de ${match.away.name}.`}
+            description={`Padrão de falta e pressão recente de ${safeMatch.away.name}.`}
           />
           {isSoccer && safeAnalysis.penaltyRisk != null && (
             <InsightCard
@@ -298,8 +316,8 @@ export default function AnalysisPage() {
           <MomentumChart
             momentumHome={safeAnalysis.momentumHome}
             momentumAway={safeAnalysis.momentumAway}
-            homeTeam={match.home.shortName}
-            awayTeam={match.away.shortName}
+            homeTeam={safeMatch.home.shortName}
+            awayTeam={safeMatch.away.shortName}
           />
         </div>
       </section>
@@ -310,6 +328,46 @@ export default function AnalysisPage() {
 function toSafeInt(value, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? Math.round(n) : fallback;
+}
+
+function normalizeMatchForUi(match, matchId, teams) {
+  if (match?.home?.name && match?.away?.name) {
+    return {
+      ...match,
+      id: String(match?.id || matchId || ''),
+      sport: String(match?.sport || 'soccer').toLowerCase(),
+      league: match?.league || 'Análise de Partida',
+      minute: match?.minute ?? '',
+      homeScore: toSafeInt(match?.homeScore, 0),
+      awayScore: toSafeInt(match?.awayScore, 0),
+      home: {
+        ...match.home,
+        shortName: String(match?.home?.shortName || match?.home?.name || 'CAS')
+          .slice(0, 3)
+          .toUpperCase(),
+        logo: match?.home?.logo || (
+          <TeamShield
+            name={match?.home?.name || 'Time Casa'}
+            externalId={String(match?.id || matchId || '')}
+          />
+        ),
+      },
+      away: {
+        ...match.away,
+        shortName: String(match?.away?.shortName || match?.away?.name || 'FOR')
+          .slice(0, 3)
+          .toUpperCase(),
+        logo: match?.away?.logo || (
+          <TeamShield
+            name={match?.away?.name || 'Time Fora'}
+            externalId={String(match?.id || matchId || '')}
+          />
+        ),
+      },
+    };
+  }
+
+  return buildFallbackMatch(matchId, teams);
 }
 
 function normalizeAnalysisForUi(raw, match) {
