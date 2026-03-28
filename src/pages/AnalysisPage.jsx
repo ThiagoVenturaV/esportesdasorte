@@ -1,115 +1,82 @@
-import { useState, useEffect } from 'react';
-import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { getMatchById } from '@/api/matches';
 import { getMatchAnalysis, getSavedMatchAnalysis } from '@/api/analysis';
 import { ROUTES } from '@/config/routes';
 import TeamShield from '@/components/TeamShield';
-import {
-  GoalIcon,
-  YellowCardIcon,
-  RedCardIcon,
-  SparkleIcon,
-} from '@/components/Icons';
-import ProbabilityBar from '@/components/Analysis/ProbabilityBar';
-import InsightCard from '@/components/Analysis/InsightCard';
-import MomentumChart from '@/components/Analysis/MomentumChart';
 import styles from './AnalysisPage.module.css';
 
-/**
- * AnalysisPage — Core innovation: AI sports analysis
- * Probability, insights, momentum, commentary — interpretation over raw data
- */
 export default function AnalysisPage() {
   const { matchId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [match, setMatch] = useState(null);
   const [analysis, setAnalysis] = useState(null);
-  const [loading, setLoading] = useState(true);
 
   const preloadedLiveMatch = location.state?.preloadedLiveMatch ?? null;
   const preloadedAnalysis = location.state?.preloadedAnalysis ?? null;
   const fallbackTeams = location.state?.teams ?? null;
 
-  function toMatchContext(matchData) {
-    if (!matchData?.home?.name || !matchData?.away?.name) return null;
-    return {
-      home: { name: matchData.home.name },
-      away: { name: matchData.away.name },
-    };
-  }
+  const stateKey = useMemo(() => {
+    return JSON.stringify({
+      preloadedMatchId: preloadedLiveMatch?.match_id || null,
+      hasPreloadedAnalysis: Boolean(preloadedAnalysis),
+      fallbackHome: fallbackTeams?.home?.name || '',
+      fallbackAway: fallbackTeams?.away?.name || '',
+    });
+  }, [preloadedLiveMatch, preloadedAnalysis, fallbackTeams]);
 
   useEffect(() => {
-    let active = true;
+    let cancelled = false;
 
-    async function loadData() {
+    async function load() {
       setLoading(true);
+      setError('');
+
       try {
-        const hasLivePreload =
+        const sameLivePreload =
           preloadedLiveMatch?.match_id &&
           String(preloadedLiveMatch.match_id) === String(matchId);
 
-        const preloadedMatch = hasLivePreload
+        const preloadedMatch = sameLivePreload
           ? mapLiveAnalysisToMatch(preloadedLiveMatch)
           : null;
 
-        const contextFromState =
-          toMatchContext(preloadedMatch) ||
-          (fallbackTeams
-            ? {
-                home: { name: fallbackTeams?.home?.name || 'Time Casa' },
-                away: { name: fallbackTeams?.away?.name || 'Time Fora' },
-              }
-            : null);
+        const initialMatch =
+          preloadedMatch ||
+          (await getMatchById(matchId)) ||
+          buildFallbackMatch(matchId, fallbackTeams);
 
-        const matchPromise = preloadedMatch
-          ? Promise.resolve(preloadedMatch)
-          : getMatchById(matchId);
+        const context = toMatchContext(initialMatch);
+        let nextAnalysis =
+          preloadedAnalysis || (await getSavedMatchAnalysis(matchId, context));
 
-        const savedAnalysisPromise = preloadedAnalysis
-          ? Promise.resolve(preloadedAnalysis)
-          : getSavedMatchAnalysis(matchId, contextFromState);
-
-        const [m, savedAnalysis] = await Promise.all([
-          matchPromise,
-          savedAnalysisPromise,
-        ]);
-
-        if (!active) return;
-
-        const safeMatch = m || buildFallbackMatch(matchId, fallbackTeams);
-        const effectiveContext = toMatchContext(safeMatch);
-
-        let a = savedAnalysis;
-        if (!a) {
-          a = await getSavedMatchAnalysis(matchId, effectiveContext);
+        if (!nextAnalysis) {
+          nextAnalysis = await getMatchAnalysis(matchId, context);
         }
-        if (!a) {
-          a = await getMatchAnalysis(matchId, effectiveContext);
-        }
-        if (!active) return;
 
-        setMatch(safeMatch);
-        setAnalysis(a);
-      } catch (error) {
-        console.error('[AnalysisPage] Erro ao carregar análise:', error);
-        if (!active) return;
+        if (cancelled) return;
+        setMatch(initialMatch);
+        setAnalysis(nextAnalysis);
+      } catch (e) {
+        console.error('[AnalysisPage] erro ao carregar:', e);
+        if (cancelled) return;
         setMatch(buildFallbackMatch(matchId, fallbackTeams));
         setAnalysis(null);
+        setError('Nao foi possivel carregar a analise desta partida agora.');
       } finally {
-        if (active) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     }
 
-    loadData();
-
+    load();
     return () => {
-      active = false;
+      cancelled = true;
     };
-  }, [matchId, preloadedLiveMatch, preloadedAnalysis, fallbackTeams]);
+  }, [matchId, stateKey]);
 
   function handleBack() {
     if (window.history.length > 1) {
@@ -120,69 +87,28 @@ export default function AnalysisPage() {
   }
 
   const safeMatch = normalizeMatchForUi(match, matchId, fallbackTeams);
-
-  if (loading) return <AnalysisSkeleton />;
-
-  if (!safeMatch && !analysis) {
-    return (
-      <div className={styles.page}>
-        <div className={styles.errorCard}>
-          <h2>Partida não encontrada</h2>
-          <p>
-            Não foi possível carregar os dados desta partida. Ela pode ter sido
-            encerrada ou removida.
-          </p>
-          <Link to={ROUTES.HOME} className={styles.backLink}>
-            ← Ir para a Home
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (!analysis) {
-    return (
-      <div className={styles.page}>
-        <div className={styles.errorCard}>
-          <h2>Análise Indisponível</h2>
-          <p>
-            Nossos algoritmos de IA ainda não processaram os dados para{' '}
-            {safeMatch.home.name} vs {safeMatch.away.name}.
-          </p>
-          <button
-            type="button"
-            onClick={handleBack}
-            className={styles.backLink}
-          >
-            ← Voltar
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   const safeAnalysis = normalizeAnalysisForUi(analysis, safeMatch);
 
-  const isSoccer = safeMatch.sport === 'soccer';
+  if (loading) {
+    return (
+      <div className={styles.page}>
+        <AnalysisSkeleton />
+      </div>
+    );
+  }
 
   return (
     <div className={styles.page}>
-      {/* Back navigation */}
       <button type="button" onClick={handleBack} className={styles.backLink}>
         ← Voltar
       </button>
 
-      {/* Match Header */}
-      <motion.div
-        className={styles.matchHeader}
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
+      <section className={styles.matchHeader}>
         <div className={styles.headerTop}>
           <span className={styles.league}>{safeMatch.league}</span>
           <span className={styles.liveChip}>
-            <span className={styles.liveDot} aria-hidden="true" /> AO VIVO{' '}
-            {safeMatch.minute}
+            <span className={styles.liveDot} aria-hidden="true" />
+            {safeMatch.minute ? `AO VIVO ${safeMatch.minute}` : 'PRE-JOGO'}
           </span>
         </div>
 
@@ -193,131 +119,90 @@ export default function AnalysisPage() {
           </div>
           <div className={styles.sbScore}>
             <span className={styles.sbNum}>{safeMatch.homeScore}</span>
-            <span className={styles.sbSep}>–</span>
+            <span className={styles.sbSep}>-</span>
             <span className={styles.sbNum}>{safeMatch.awayScore}</span>
           </div>
-          <div className={`${styles.sbTeam} ${styles.sbTeamAway}`}>
+          <div className={styles.sbTeam}>
             <span className={styles.sbLogo}>{safeMatch.away.logo}</span>
             <span className={styles.sbName}>{safeMatch.away.name}</span>
           </div>
         </div>
 
-        {/* AI Prediction badge */}
         <div className={styles.predContainer}>
           <div className={styles.predBadge}>
-            <span className={styles.predLabel}>PREVISÃO IA</span>
+            <span className={styles.predLabel}>PREVISAO IA</span>
             <span className={styles.predValue}>
               {safeAnalysis.predictedWinner}
             </span>
             <span className={styles.predConf}>
-              {safeAnalysis.confidenceScore}% confiança
+              {safeAnalysis.confidenceScore}% confianca
             </span>
           </div>
 
-          <p className={styles.aiDisclaimer}>
-            Edson é uma IA e pode cometer erros. Por favor, verifique as
-            respostas.
-          </p>
-
           <div className={styles.betCTAWrapper}>
-            <Link
-              to={ROUTES.BETTING(safeMatch.id || String(matchId || ''))}
-              className={styles.betCTA}
-            >
+            <Link to={ROUTES.BETTING(safeMatch.id)} className={styles.betCTA}>
               APOSTAR AGORA
             </Link>
           </div>
         </div>
-      </motion.div>
+      </section>
 
-      {/* AI Commentary */}
+      {error ? <p className={styles.error}>{error}</p> : null}
+
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Análise da IA</h2>
+        <h2 className={styles.sectionTitle}>Leitura da Partida</h2>
         <div className={styles.card}>
           <ul className={styles.commentary}>
-            {safeAnalysis.commentary.map((line, i) => (
-              <motion.li
-                key={i}
-                className={styles.commentLine}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 1.5 }}
-              >
-                <span className={styles.commentIcon}>
-                  <SparkleIcon />
-                </span>
-                <span className={styles.commentText}>
-                  <TypewriterText
-                    text={line}
-                    startDelay={i * 1500 + 400}
-                    speed={20}
-                  />
-                </span>
-              </motion.li>
+            {safeAnalysis.commentary.slice(0, 5).map((line, idx) => (
+              <li key={`${idx}-${line}`} className={styles.commentLine}>
+                {line}
+              </li>
             ))}
           </ul>
         </div>
       </section>
 
-      {/* Win Probability */}
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Probabilidade de Vitória</h2>
+        <h2 className={styles.sectionTitle}>Probabilidade</h2>
         <div className={styles.card}>
-          <ProbabilityBar
-            home={safeAnalysis.winProbability.home}
-            draw={safeAnalysis.winProbability.draw}
-            away={safeAnalysis.winProbability.away}
-            homeTeam={safeMatch.home.shortName}
-            awayTeam={safeMatch.away.shortName}
+          <SimpleProbability
+            label={safeMatch.home.shortName}
+            value={safeAnalysis.winProbability.home}
+          />
+          <SimpleProbability
+            label="EMP"
+            value={safeAnalysis.winProbability.draw}
+          />
+          <SimpleProbability
+            label={safeMatch.away.shortName}
+            value={safeAnalysis.winProbability.away}
           />
         </div>
       </section>
 
-      {/* Insights Grid */}
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Insights em Tempo Real</h2>
+        <h2 className={styles.sectionTitle}>Indicadores Rapidos</h2>
         <div className={styles.insightGrid}>
-          {isSoccer && (
-            <InsightCard
-              icon={<GoalIcon />}
-              title="Prob. de Gol (próx. 10 min)"
-              value={safeAnalysis.goalProbabilityNextMinute}
-              description="Baseado em pressão, finalizações e posse de bola recente."
-              invertRisk
-            />
-          )}
-          <InsightCard
-            icon={<YellowCardIcon />}
-            title={`Risco de Cartão — ${safeMatch.home.shortName}`}
+          <MetricCard
+            title="Gol proximos 10 min"
+            value={safeAnalysis.goalProbabilityNextMinute}
+          />
+          <MetricCard
+            title={`Cartao ${safeMatch.home.shortName}`}
             value={safeAnalysis.cardRiskHome}
-            description={`Nível de agressividade e faltas táticas de ${safeMatch.home.name}.`}
           />
-          <InsightCard
-            icon={<YellowCardIcon />}
-            title={`Risco de Cartão — ${safeMatch.away.shortName}`}
+          <MetricCard
+            title={`Cartao ${safeMatch.away.shortName}`}
             value={safeAnalysis.cardRiskAway}
-            description={`Padrão de falta e pressão recente de ${safeMatch.away.name}.`}
           />
-          {isSoccer && safeAnalysis.penaltyRisk != null && (
-            <InsightCard
-              icon={<RedCardIcon />}
-              title="Risco de Pênalti"
-              value={safeAnalysis.penaltyRisk}
-              description="Baseado em entradas na área, faltas e histórico de árbitro."
-            />
-          )}
-        </div>
-      </section>
-
-      {/* Momentum Chart */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Momentum da Partida</h2>
-        <div className={styles.card}>
-          <MomentumChart
-            momentumHome={safeAnalysis.momentumHome}
-            momentumAway={safeAnalysis.momentumAway}
-            homeTeam={safeMatch.home.shortName}
-            awayTeam={safeMatch.away.shortName}
+          <MetricCard title="Penalti" value={safeAnalysis.penaltyRisk} />
+          <MetricCard
+            title={`Momentum ${safeMatch.home.shortName}`}
+            value={safeAnalysis.momentumHome}
+          />
+          <MetricCard
+            title={`Momentum ${safeMatch.away.shortName}`}
+            value={safeAnalysis.momentumAway}
           />
         </div>
       </section>
@@ -325,70 +210,101 @@ export default function AnalysisPage() {
   );
 }
 
+function SimpleProbability({ label, value }) {
+  const safe = clampPct(value);
+  return (
+    <div className={styles.probRow}>
+      <span className={styles.probLabel}>{label}</span>
+      <div className={styles.probTrack}>
+        <div className={styles.probFill} style={{ width: `${safe}%` }} />
+      </div>
+      <span className={styles.probValue}>{safe}%</span>
+    </div>
+  );
+}
+
+function MetricCard({ title, value }) {
+  const safe = clampPct(value);
+  return (
+    <div className={styles.metricCard}>
+      <span className={styles.metricTitle}>{title}</span>
+      <span className={styles.metricValue}>{safe}%</span>
+    </div>
+  );
+}
+
+function toMatchContext(matchData) {
+  if (!matchData?.home?.name || !matchData?.away?.name) return null;
+  return {
+    home: { name: matchData.home.name },
+    away: { name: matchData.away.name },
+  };
+}
+
 function toSafeInt(value, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? Math.round(n) : fallback;
 }
 
+function clampPct(value) {
+  const n = toSafeInt(value, 0);
+  if (n < 0) return 0;
+  if (n > 100) return 100;
+  return n;
+}
+
 function normalizeMatchForUi(match, matchId, teams) {
-  if (match?.home?.name && match?.away?.name) {
-    return {
-      ...match,
-      id: String(match?.id || matchId || ''),
-      sport: String(match?.sport || 'soccer').toLowerCase(),
-      league: match?.league || 'Análise de Partida',
-      minute: match?.minute ?? '',
-      homeScore: toSafeInt(match?.homeScore, 0),
-      awayScore: toSafeInt(match?.awayScore, 0),
-      home: {
-        ...match.home,
-        shortName: String(match?.home?.shortName || match?.home?.name || 'CAS')
-          .slice(0, 3)
-          .toUpperCase(),
-        logo: match?.home?.logo || (
-          <TeamShield
-            name={match?.home?.name || 'Time Casa'}
-            externalId={String(match?.id || matchId || '')}
-          />
-        ),
-      },
-      away: {
-        ...match.away,
-        shortName: String(match?.away?.shortName || match?.away?.name || 'FOR')
-          .slice(0, 3)
-          .toUpperCase(),
-        logo: match?.away?.logo || (
-          <TeamShield
-            name={match?.away?.name || 'Time Fora'}
-            externalId={String(match?.id || matchId || '')}
-          />
-        ),
-      },
-    };
+  if (!match?.home?.name || !match?.away?.name) {
+    return buildFallbackMatch(matchId, teams);
   }
 
-  return buildFallbackMatch(matchId, teams);
+  const homeName = String(match.home.name || 'Time Casa');
+  const awayName = String(match.away.name || 'Time Fora');
+
+  return {
+    ...match,
+    id: String(match.id || matchId || ''),
+    league: String(match.league || 'Analise de Partida'),
+    minute: String(match.minute || ''),
+    homeScore: toSafeInt(match.homeScore, 0),
+    awayScore: toSafeInt(match.awayScore, 0),
+    home: {
+      ...match.home,
+      name: homeName,
+      shortName: String(match.home.shortName || homeName)
+        .slice(0, 3)
+        .toUpperCase(),
+      logo: match.home.logo || (
+        <TeamShield
+          name={homeName}
+          externalId={`${match.id || matchId || ''}-home`}
+        />
+      ),
+    },
+    away: {
+      ...match.away,
+      name: awayName,
+      shortName: String(match.away.shortName || awayName)
+        .slice(0, 3)
+        .toUpperCase(),
+      logo: match.away.logo || (
+        <TeamShield
+          name={awayName}
+          externalId={`${match.id || matchId || ''}-away`}
+        />
+      ),
+    },
+  };
 }
 
 function normalizeAnalysisForUi(raw, match) {
   const homeTeamName = match?.home?.name || 'Time Casa';
-  const awayTeamName = match?.away?.name || 'Time Fora';
 
   if (!raw || typeof raw !== 'object') {
-    return {
-      winProbability: { home: 34, draw: 32, away: 34 },
-      confidenceScore: 52,
-      predictedWinner: homeTeamName,
-      commentary: [
-        `Análise de ${homeTeamName} x ${awayTeamName} indisponível no momento.`,
-      ],
-      goalProbabilityNextMinute: 42,
-      cardRiskHome: 38,
-      cardRiskAway: 36,
-      penaltyRisk: 18,
-      momentumHome: 51,
-      momentumAway: 49,
-    };
+    return buildFallbackAnalysis(
+      homeTeamName,
+      match?.away?.name || 'Time Fora',
+    );
   }
 
   const win = raw.winProbability || raw.win_probability || {};
@@ -400,138 +316,112 @@ function normalizeAnalysisForUi(raw, match) {
 
   return {
     winProbability: {
-      home: toSafeInt(win.home, 34),
-      draw: toSafeInt(win.draw, 32),
-      away: toSafeInt(win.away, 34),
+      home: clampPct(win.home ?? 34),
+      draw: clampPct(win.draw ?? 32),
+      away: clampPct(win.away ?? 34),
     },
-    confidenceScore: toSafeInt(raw.confidenceScore ?? raw.confidence, 52),
+    confidenceScore: clampPct(raw.confidenceScore ?? raw.confidence ?? 52),
     predictedWinner: String(
       raw.predictedWinner || raw.prediction || homeTeamName,
     ),
     commentary:
       commentary.length > 0
-        ? commentary.map((line) => String(line))
+        ? commentary.map((line) => String(line)).filter(Boolean)
         : [
-            `Análise de ${homeTeamName} x ${awayTeamName} indisponível no momento.`,
+            `${homeTeamName} tem leve vantagem no cenario atual, mas a entrada pede controle de risco.`,
+            'Mercado principal depende do ritmo de finalizacao e do momento da partida.',
           ],
-    goalProbabilityNextMinute: toSafeInt(raw.goalProbabilityNextMinute, 42),
-    cardRiskHome: toSafeInt(raw.cardRiskHome, 38),
-    cardRiskAway: toSafeInt(raw.cardRiskAway ?? raw.cardRisskAway, 36),
-    penaltyRisk: toSafeInt(raw.penaltyRisk, 18),
-    momentumHome: toSafeInt(raw.momentumHome, 51),
-    momentumAway: toSafeInt(raw.momentumAway, 49),
+    goalProbabilityNextMinute: clampPct(raw.goalProbabilityNextMinute ?? 42),
+    cardRiskHome: clampPct(raw.cardRiskHome ?? 38),
+    cardRiskAway: clampPct(raw.cardRiskAway ?? raw.cardRisskAway ?? 36),
+    penaltyRisk: clampPct(raw.penaltyRisk ?? 18),
+    momentumHome: clampPct(raw.momentumHome ?? 51),
+    momentumAway: clampPct(raw.momentumAway ?? 49),
+  };
+}
+
+function buildFallbackAnalysis(homeName, awayName) {
+  return {
+    winProbability: { home: 34, draw: 32, away: 34 },
+    confidenceScore: 52,
+    predictedWinner: homeName,
+    commentary: [
+      `Analise de ${homeName} x ${awayName} em modo simplificado.`,
+      'Use stake controlada e priorize mercados com linha de protecao.',
+    ],
+    goalProbabilityNextMinute: 42,
+    cardRiskHome: 38,
+    cardRiskAway: 36,
+    penaltyRisk: 18,
+    momentumHome: 51,
+    momentumAway: 49,
   };
 }
 
 function buildFallbackMatch(matchId, teams) {
   const homeName = teams?.home?.name || 'Time Casa';
   const awayName = teams?.away?.name || 'Time Fora';
+  const safeId = String(matchId || 'fallback-match');
 
   return {
-    id: String(matchId || ''),
-    status: 'live',
-    sport: 'soccer',
-    league: 'Análise de Partida',
+    id: safeId,
+    league: 'Analise de Partida',
+    minute: '',
+    homeScore: 0,
+    awayScore: 0,
     home: {
       name: homeName,
       shortName: String(homeName).slice(0, 3).toUpperCase(),
       logo: (
-        <TeamShield name={homeName} externalId={`${matchId}-home-fallback`} />
+        <TeamShield name={homeName} externalId={`${safeId}-home-fallback`} />
       ),
     },
     away: {
       name: awayName,
       shortName: String(awayName).slice(0, 3).toUpperCase(),
       logo: (
-        <TeamShield name={awayName} externalId={`${matchId}-away-fallback`} />
+        <TeamShield name={awayName} externalId={`${safeId}-away-fallback`} />
       ),
     },
-    homeScore: 0,
-    awayScore: 0,
-    minute: '',
-    period: 'Pré-jogo',
-    odds: { home: 0, draw: 0, away: 0 },
   };
 }
 
 function mapLiveAnalysisToMatch(liveMatch) {
+  const matchId = String(liveMatch?.match_id || '');
+  const homeName = liveMatch?.home_team || 'Casa';
+  const awayName = liveMatch?.away_team || 'Fora';
   const minuteRaw = liveMatch?.live_data?.minute;
-  const minute =
-    minuteRaw == null
-      ? ''
-      : String(minuteRaw).includes("'")
-        ? String(minuteRaw)
-        : `${minuteRaw}'`;
+  const minute = minuteRaw == null ? '' : String(minuteRaw).replace(/\s+/g, '');
 
   return {
-    id: String(liveMatch?.match_id || ''),
-    status: 'live',
-    sport: 'soccer',
-    league: liveMatch?.league_name || 'Partida em Andamento',
+    id: matchId,
+    league: String(liveMatch?.league_name || 'Partida em andamento'),
+    minute: minute ? `${minute}'` : '',
+    homeScore: toSafeInt(liveMatch?.live_data?.home_score, 0),
+    awayScore: toSafeInt(liveMatch?.live_data?.away_score, 0),
     home: {
-      name: liveMatch?.home_team || 'Casa',
-      shortName: String(liveMatch?.home_team || 'CAS')
-        .slice(0, 3)
-        .toUpperCase(),
-      logo: (
-        <TeamShield
-          name={liveMatch?.home_team || 'Casa'}
-          externalId={String(liveMatch?.match_id || '')}
-        />
-      ),
+      name: homeName,
+      shortName: String(homeName).slice(0, 3).toUpperCase(),
+      logo: <TeamShield name={homeName} externalId={`${matchId}-home`} />,
     },
     away: {
-      name: liveMatch?.away_team || 'Fora',
-      shortName: String(liveMatch?.away_team || 'FOR')
-        .slice(0, 3)
-        .toUpperCase(),
-      logo: (
-        <TeamShield
-          name={liveMatch?.away_team || 'Fora'}
-          externalId={String(liveMatch?.match_id || '')}
-        />
-      ),
+      name: awayName,
+      shortName: String(awayName).slice(0, 3).toUpperCase(),
+      logo: <TeamShield name={awayName} externalId={`${matchId}-away`} />,
     },
-    homeScore: Number(liveMatch?.live_data?.home_score ?? 0),
-    awayScore: Number(liveMatch?.live_data?.away_score ?? 0),
-    minute,
-    period: 'Ao Vivo',
-    odds: { home: 0, draw: 0, away: 0 },
   };
-}
-
-function TypewriterText({ text, startDelay = 0, speed = 25 }) {
-  const [displayed, setDisplayed] = useState('');
-
-  useEffect(() => {
-    let timeout;
-    let i = 0;
-
-    function type() {
-      if (i < text.length) {
-        setDisplayed(text.slice(0, i + 1));
-        i++;
-        timeout = setTimeout(type, speed);
-      }
-    }
-
-    timeout = setTimeout(type, startDelay);
-    return () => clearTimeout(timeout);
-  }, [text, startDelay, speed]);
-
-  return <>{displayed}</>;
 }
 
 function AnalysisSkeleton() {
   return (
-    <div className={styles.page}>
+    <>
       <div
         className={`skeleton ${styles.skH}`}
-        style={{ height: 160, borderRadius: 16 }}
+        style={{ height: 170, borderRadius: 16 }}
       />
       <div
         className={`skeleton ${styles.skH}`}
-        style={{ height: 80, borderRadius: 12 }}
+        style={{ height: 120, borderRadius: 12 }}
       />
       <div
         className={`skeleton ${styles.skH}`}
@@ -541,6 +431,6 @@ function AnalysisSkeleton() {
         className={`skeleton ${styles.skH}`}
         style={{ height: 160, borderRadius: 12 }}
       />
-    </div>
+    </>
   );
 }

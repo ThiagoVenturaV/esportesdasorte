@@ -319,6 +319,86 @@
   margin: 0;
 }
 
+.probRow {
+  display: grid;
+  grid-template-columns: 48px 1fr 52px;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.probRow:last-child {
+  margin-bottom: 0;
+}
+
+.probLabel {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.probTrack {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.probFill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-gradient);
+}
+
+.probValue {
+  text-align: right;
+  color: var(--color-text-primary);
+  font-weight: 700;
+  font-size: var(--font-size-xs);
+}
+
+.metricCard {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 92px;
+}
+
+.metricTitle {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.35;
+}
+
+.metricValue {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+}
+
+@media (max-width: 680px) {
+  .insightGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .predBadge {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .betCTA {
+    width: 100%;
+    padding: 14px 16px;
+  }
+}
+
 /* ── Desktop Responsive ─────────────────────────────────────────── */
 
 /* ≥768px — centered content max-width, larger scoreboard, wider padding */
