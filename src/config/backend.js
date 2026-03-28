@@ -1,5 +1,4 @@
-const DEFAULT_PRODUCTION_BACKEND =
-  'https://esportesdasorteback-production.up.railway.app';
+const DEFAULT_PRODUCTION_BACKEND = 'https://api.thiagoventura.online';
 
 const DEFAULT_BACKEND_URL = import.meta.env.PROD
   ? DEFAULT_PRODUCTION_BACKEND

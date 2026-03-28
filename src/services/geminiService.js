@@ -31,7 +31,9 @@ export async function sendMessage(userMessage, conversationHistory = []) {
 
   const payload = {
     message: userMessage,
+    // Send both keys for backward compatibility with different backend contracts.
     history: trimmedHistory,
+    conversation_history: trimmedHistory,
   };
 
   const controller = new AbortController();
@@ -52,8 +54,43 @@ export async function sendMessage(userMessage, conversationHistory = []) {
 
     if (!response.ok) {
       console.error(`[Edson] Backend retornou status ${response.status}`);
+
+      let backendMessage = '';
+      try {
+        const errorData = await response.json();
+        backendMessage =
+          errorData?.detail || errorData?.response || errorData?.message || '';
+      } catch {
+        // Ignore JSON parse errors and keep a generic fallback message.
+      }
+
+      if (response.status === 429) {
+        return {
+          text: 'Você atingiu o limite de mensagens por minuto. Aguarde um pouco e tente novamente.',
+          cta: null,
+        };
+      }
+
+      if (response.status >= 500) {
+        return {
+          text:
+            backendMessage ||
+            'O backend está com erro interno no momento. Tente novamente em instantes.',
+          cta: null,
+        };
+      }
+
+      if (response.status === 401 || response.status === 403) {
+        return {
+          text: 'Sua sessão expirou ou não tem permissão. Faça login novamente.',
+          cta: null,
+        };
+      }
+
       return {
-        text: 'Desculpe, estou temporariamente indisponível. Meu banco de dados (Neon) pode estar fora do ar.',
+        text:
+          backendMessage ||
+          'Desculpe, não foi possível concluir sua solicitação agora.',
         cta: null,
       };
     }
@@ -85,6 +122,24 @@ export async function sendMessage(userMessage, conversationHistory = []) {
     }
 
     console.error('[Edson] Erro de rede:', error.message);
+
+    if (
+      window.location.protocol === 'https:' &&
+      BACKEND_URL.startsWith('http://')
+    ) {
+      return {
+        text: 'Conexão bloqueada pelo navegador: frontend HTTPS não pode chamar backend HTTP. Configure VITE_BACKEND_URL com HTTPS.',
+        cta: null,
+      };
+    }
+
+    if (error instanceof TypeError) {
+      return {
+        text: 'Falha de rede/CORS ao acessar o backend. Verifique VITE_BACKEND_URL e as regras de CORS do servidor.',
+        cta: null,
+      };
+    }
+
     return {
       text: 'Desculpe, não consigo me conectar ao backend. Verifique se o servidor Python está rodando.',
       cta: null,
