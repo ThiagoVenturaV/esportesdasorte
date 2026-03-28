@@ -5,6 +5,8 @@ import { useBetSlip } from '@/components/BetSlip/BetSlipContext';
 import { ROUTES } from '@/config/routes';
 import styles from './LiveMatchesCarousel.module.css';
 
+const PREVIEW_LIMIT = 3;
+
 /**
  * LiveMatchesCarousel — Exibe análises ao vivo do backend (compartilhadas entre todos os usuários).
  * Usa diretamente /api/analises-ao-vivo para garantir dados atuais.
@@ -18,7 +20,7 @@ export default function LiveMatchesCarousel() {
     try {
       setLoading(true);
       const response = await fetchWithBackendFallback(
-        '/api/analises-ao-vivo?limit=8',
+        `/api/analises-ao-vivo?limit=${PREVIEW_LIMIT}`,
       );
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -59,6 +61,8 @@ export default function LiveMatchesCarousel() {
     );
   }
 
+  const displayedAnalyses = analyses.slice(0, PREVIEW_LIMIT);
+
   return (
     <section className={styles.container}>
       <div className={styles.header}>
@@ -75,7 +79,7 @@ export default function LiveMatchesCarousel() {
       </div>
 
       <div className={styles.carousel}>
-        {analyses.map((match) => {
+        {displayedAnalyses.map((match) => {
           const analysis = match.analysis || {};
           const win = analysis.winProbability || {};
           const comments = Array.isArray(analysis.commentary)
@@ -173,6 +177,12 @@ export default function LiveMatchesCarousel() {
             </Link>
           );
         })}
+      </div>
+
+      <div className={styles.bottomCtaWrap}>
+        <Link to={ROUTES.LIVE_ANALYSIS} className={styles.bottomCta}>
+          VER TODOS OS JOGOS AO VIVO
+        </Link>
       </div>
     </section>
   );

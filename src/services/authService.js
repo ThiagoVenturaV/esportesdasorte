@@ -8,6 +8,16 @@ async function parseJsonSafe(response) {
   }
 }
 
+function getApiErrorMessage(data, fallbackMessage) {
+  return (
+    data?.erro ||
+    data?.detail ||
+    data?.mensagem ||
+    data?.message ||
+    fallbackMessage
+  );
+}
+
 /**
  * Returns stored JWT token.
  */
@@ -35,11 +45,11 @@ export async function loginUser({ email_usuario, senha_usuario }) {
 
   const data = await parseJsonSafe(response);
   if (!response.ok) {
-    throw new Error(data?.erro || 'Falha ao autenticar usuário.');
+    throw new Error(getApiErrorMessage(data, 'Falha ao autenticar usuário.'));
   }
 
   if (!data?.sucesso) {
-    throw new Error(data?.erro || 'Credenciais inválidas.');
+    throw new Error(getApiErrorMessage(data, 'Credenciais inválidas.'));
   }
 
   // Salvar JWT token se retornado pelo backend
@@ -59,11 +69,13 @@ export async function registerUser(payload) {
 
   const data = await parseJsonSafe(response);
   if (!response.ok) {
-    throw new Error(data?.erro || 'Falha ao cadastrar usuário.');
+    throw new Error(getApiErrorMessage(data, 'Falha ao cadastrar usuário.'));
   }
 
   if (!data?.sucesso) {
-    throw new Error(data?.erro || 'Não foi possível concluir o cadastro.');
+    throw new Error(
+      getApiErrorMessage(data, 'Não foi possível concluir o cadastro.'),
+    );
   }
 
   return data;

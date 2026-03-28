@@ -143,15 +143,6 @@ export default function TopBar({ onMenuClick }) {
                   <RegisterIcon />
                   Minha Conta
                 </Link>
-                <Link
-                  to={ROUTES.ACCOUNT_SECURITY}
-                  className={styles.dropdownItem}
-                  role="menuitem"
-                  onClick={() => setAccountOpen(false)}
-                >
-                  <LoginIcon />
-                  Segurança
-                </Link>
                 <button
                   type="button"
                   className={styles.dropdownItem}
@@ -161,6 +152,15 @@ export default function TopBar({ onMenuClick }) {
                   <LogoutIcon />
                   Sair
                 </button>
+                <Link
+                  to={ROUTES.ACCOUNT_SECURITY}
+                  className={styles.dropdownItem}
+                  role="menuitem"
+                  onClick={() => setAccountOpen(false)}
+                >
+                  <LoginIcon />
+                  Segurança
+                </Link>
               </>
             ) : (
               <>
