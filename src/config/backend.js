@@ -1,5 +1,5 @@
 const DEFAULT_PRODUCTION_BACKEND =
-  'https://esportesdasorteback-production.up.railway.app';
+  'https://esportesdasorteback-production-7ace.up.railway.app';
 const DEFAULT_PRODUCTION_BACKEND_FALLBACK =
   'https://esportesdasorteback.onrender.com';
 
