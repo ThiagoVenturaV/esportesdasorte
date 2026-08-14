@@ -3,6 +3,14 @@ import { resolveShieldUrls } from '@/config/teamShields';
 
 const betanoBadgeCache = new Map();
 const sportsDbBadgeCache = new Map();
+const MAX_BADGE_CACHE_ENTRIES = 250;
+
+function cacheBadge(cache, key, value) {
+  cache.set(key, value);
+  while (cache.size > MAX_BADGE_CACHE_ENTRIES) {
+    cache.delete(cache.keys().next().value);
+  }
+}
 
 const BETANO_API_CANDIDATES = [
   '/betano-api/api/sport/teams/search',
@@ -92,7 +100,7 @@ async function fetchBetanoBadge(teamName) {
       const data = await response.json();
       const badge = findLogoLikeField(data);
       if (badge) {
-        betanoBadgeCache.set(normalized, badge);
+        cacheBadge(betanoBadgeCache, normalized, badge);
         return badge;
       }
     } catch {
@@ -100,7 +108,7 @@ async function fetchBetanoBadge(teamName) {
     }
   }
 
-  betanoBadgeCache.set(normalized, null);
+  cacheBadge(betanoBadgeCache, normalized, null);
   return null;
 }
 
@@ -118,16 +126,16 @@ async function fetchSportsDbBadge(teamName) {
     const url = `https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=${encodeURIComponent(teamName)}`;
     const response = await fetch(url);
     if (!response.ok) {
-      sportsDbBadgeCache.set(normalized, null);
+      cacheBadge(sportsDbBadgeCache, normalized, null);
       return null;
     }
 
     const data = await response.json();
     const badge = data?.teams?.[0]?.strBadge || null;
-    sportsDbBadgeCache.set(normalized, badge);
+    cacheBadge(sportsDbBadgeCache, normalized, badge);
     return badge;
   } catch {
-    sportsDbBadgeCache.set(normalized, null);
+    cacheBadge(sportsDbBadgeCache, normalized, null);
     return null;
   }
 }

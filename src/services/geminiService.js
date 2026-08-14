@@ -64,7 +64,20 @@ function setFastCachedResponse(cacheKey, payload) {
         fastResponseCache.delete(key);
       }
     }
+    while (fastResponseCache.size > 120) {
+      const oldestKey = fastResponseCache.keys().next().value;
+      if (oldestKey === undefined) break;
+      fastResponseCache.delete(oldestKey);
+    }
   }
+}
+
+function sanitizeCta(value) {
+  if (!value || typeof value !== 'object') return null;
+  const href = typeof value.href === 'string' ? value.href.trim() : '';
+  const label = typeof value.label === 'string' ? value.label.trim().slice(0, 80) : '';
+  if (!label || !href.startsWith('/') || href.startsWith('//') || href.length > 300) return null;
+  return { label, href, variant: String(value.variant || '').slice(0, 40) };
 }
 
 /**
@@ -150,10 +163,10 @@ export async function sendMessage(userMessage, conversationHistory = []) {
 
     const data = await response.json();
 
-    if (data.response) {
+    if (typeof data.response === 'string' && data.response.trim()) {
       const result = {
-        text: data.response.trim(),
-        cta: data.cta || null,
+        text: data.response.trim().slice(0, 10_000),
+        cta: sanitizeCta(data.cta),
       };
       setFastCachedResponse(cacheKey, result);
       return result;

@@ -30,9 +30,11 @@ function normalizeBackendUrl(rawUrl) {
       parsed.port = '';
     }
 
+    if (!['http:', 'https:'].includes(parsed.protocol)) return fallback;
+    if (import.meta.env.PROD && parsed.protocol !== 'https:') return fallback;
     return parsed.toString().replace(/\/$/, '');
   } catch {
-    return value.replace(/\/$/, '');
+    return fallback;
   }
 }
 
@@ -82,7 +84,13 @@ function buildBackendCandidates() {
 export function buildBackendUrl(pathOrUrl) {
   const input = String(pathOrUrl || '').trim();
   if (!input) return BACKEND_URL;
-  if (/^https?:\/\//i.test(input)) return input;
+  if (/^https?:\/\//i.test(input)) {
+    const parsed = new URL(input);
+    if (parsed.origin !== new URL(BACKEND_URL).origin) {
+      throw new Error('External backend URL is not allowed');
+    }
+    return parsed.toString();
+  }
   const path = input.startsWith('/') ? input : `/${input}`;
   return `${BACKEND_URL}${path}`;
 }
@@ -95,6 +103,10 @@ export async function fetchWithBackendFallback(pathOrUrl, options = {}) {
 
   // Absolute URLs keep their original behavior (no endpoint fallback rewrite).
   if (/^https?:\/\//i.test(input)) {
+    const parsed = new URL(input);
+    if (parsed.origin !== new URL(BACKEND_URL).origin) {
+      throw new Error('External backend URL is not allowed');
+    }
     const { options: timedOptions, cleanup } = withRequestTimeout(options);
     try {
       return await fetch(input, timedOptions);
