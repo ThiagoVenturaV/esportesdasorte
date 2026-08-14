@@ -18,28 +18,28 @@ export default defineConfig({
       '/api-v2': {
         target: 'https://esportesdasorte.bet.br',
         changeOrigin: true,
-        secure: false,
+        secure: true,
       },
       '/api-generic': {
         target: 'https://esportesdasorte.bet.br',
         changeOrigin: true,
-        secure: false,
+        secure: true,
       },
       '/api': {
         target: 'https://esportesdasorte.bet.br',
         changeOrigin: true,
-        secure: false,
+        secure: true,
       },
       '/bragi': {
         target: 'https://bragi.sportingtech.com',
         changeOrigin: true,
-        secure: false,
+        secure: true,
         rewrite: (path) => path.replace(/^\/bragi/, ''),
       },
       '/betano-api': {
         target: 'https://www.betano.bet.br',
         changeOrigin: true,
-        secure: false,
+        secure: true,
         rewrite: (path) => path.replace(/^\/betano-api/, ''),
       },
     },

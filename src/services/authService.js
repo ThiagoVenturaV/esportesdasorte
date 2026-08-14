@@ -22,7 +22,14 @@ function getApiErrorMessage(data, fallbackMessage) {
  * Returns stored JWT token.
  */
 export function getAccessToken() {
-  return localStorage.getItem('eds_access_token');
+  const token = sessionStorage.getItem('eds_access_token');
+  if (token) return token;
+  const legacyToken = localStorage.getItem('eds_access_token');
+  if (legacyToken) {
+    sessionStorage.setItem('eds_access_token', legacyToken);
+    localStorage.removeItem('eds_access_token');
+  }
+  return legacyToken;
 }
 
 /**
@@ -54,7 +61,7 @@ export async function loginUser({ email_usuario, senha_usuario }) {
 
   // Salvar JWT token se retornado pelo backend
   if (data.access_token) {
-    localStorage.setItem('eds_access_token', data.access_token);
+    sessionStorage.setItem('eds_access_token', data.access_token);
   }
 
   return data;
@@ -86,4 +93,5 @@ export async function registerUser(payload) {
  */
 export function logoutUser() {
   localStorage.removeItem('eds_access_token');
+  sessionStorage.removeItem('eds_access_token');
 }
