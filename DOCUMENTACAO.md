@@ -240,7 +240,7 @@ Para que existe:
 
 Padrão atual via variável GROQ_MODEL:
 
-- meta-llama/llama-4-scout-17b-16e-instruct
+- openai/gpt-oss-120b
 
 Uso:
 
